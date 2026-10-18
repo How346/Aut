@@ -115,7 +115,7 @@ void main() {
   test('period progress', () {
     final p = TotpService.getPeriodProgress(
       period: 30,
-      time: DateTime.fromMillisecondsSinceEpoch(1600000010000),
+      time: DateTime.fromMillisecondsSinceEpoch(1600000000000),
     );
     expect(p.secondsRemaining, 20);
     expect(p.progress, closeTo(20 / 30, 0.001));
