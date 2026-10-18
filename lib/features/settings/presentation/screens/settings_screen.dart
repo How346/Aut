@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../authenticator/data/repositories/secure_account_repository.dart';
 import '../../../backup/domain/services/backup_service.dart';
@@ -167,6 +168,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Widget _section(BuildContext context, String title, List<Widget> tiles) {
+    final scheme = Theme.of(context).colorScheme;
+    final children = <Widget>[];
+    for (var i = 0; i < tiles.length; i++) {
+      if (i > 0) children.add(const Divider(indent: 16, endIndent: 16));
+      children.add(tiles[i]);
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 6, bottom: 8),
+            child: Text(
+              title.toUpperCase(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+                color: scheme.primary,
+              ),
+            ),
+          ),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: children),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _iconBadge(BuildContext context, IconData icon) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: scheme.onPrimaryContainer, size: 22),
+    );
+  }
+
+  Widget _tile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    VoidCallback? onTap,
+  }) {
+    return ListTile(
+      leading: _iconBadge(context, icon),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: subtitle == null ? null : Text(subtitle),
+      trailing: onTap == null ? null : const Icon(Icons.chevron_right_rounded),
+      enabled: !_busy,
+      onTap: onTap,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -179,86 +243,135 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return Stack(
             children: [
               ListView(
+                padding: const EdgeInsets.only(bottom: 32),
                 children: [
-                  const ListTile(
-                    leading: Icon(Icons.shield_outlined),
-                    title: Text('Security & Vault'),
-                    subtitle: Text('Secrets stored via Android Keystore'),
-                  ),
-                  SwitchListTile(
-                    secondary: const Icon(Icons.fingerprint),
-                    title: const Text('Biometric app lock'),
-                    subtitle: const Text('Require unlock on launch and resume'),
-                    value: widget.lockController.enabled,
-                    onChanged: _busy ? null : _toggleLock,
-                  ),
-                  const Divider(),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Theme',
-                            style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 8),
-                        SegmentedButton<ThemeMode>(
-                          segments: const [
-                            ButtonSegment(
-                              value: ThemeMode.system,
-                              label: Text('System'),
-                              icon: Icon(Icons.brightness_auto),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.brandGradient,
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.verified_user_rounded,
+                              color: Colors.white, size: 38),
+                          SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Your vault is protected',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Secrets live in the Android Keystore. No internet access, no tracking.',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
                             ),
-                            ButtonSegment(
-                              value: ThemeMode.light,
-                              label: Text('Light'),
-                              icon: Icon(Icons.light_mode),
-                            ),
-                            ButtonSegment(
-                              value: ThemeMode.dark,
-                              label: Text('Dark'),
-                              icon: Icon(Icons.dark_mode),
-                            ),
-                          ],
-                          selected: {widget.themeController.mode},
-                          onSelectionChanged: (s) =>
-                              widget.themeController.setMode(s.first),
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const Divider(),
-                  ListTile(
-                    leading: const Icon(Icons.save_alt),
-                    title: const Text('Export backup to file'),
-                    subtitle: const Text('Save a password-encrypted .authly file'),
-                    enabled: !_busy,
-                    onTap: () => _export(share: false),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.ios_share),
-                    title: const Text('Share encrypted backup'),
-                    subtitle: const Text('Send the .authly file via the share sheet'),
-                    enabled: !_busy,
-                    onTap: () => _export(share: true),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.folder_open),
-                    title: const Text('Import backup from file'),
-                    enabled: !_busy,
-                    onTap: _importFromFile,
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.content_paste),
-                    title: const Text('Import backup from clipboard'),
-                    enabled: !_busy,
-                    onTap: _importFromClipboard,
-                  ),
-                  const Divider(),
-                  const ListTile(
-                    leading: Icon(Icons.info_outline),
-                    title: Text('About Authly'),
-                    subtitle: Text('Version 1.0.0 • Offline-first • Zero-tracking'),
-                  ),
+                  _section(context, 'Security', [
+                    SwitchListTile(
+                      secondary: _iconBadge(context, Icons.fingerprint_rounded),
+                      title: const Text(
+                        'Biometric app lock',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle:
+                          const Text('Require unlock on launch and resume'),
+                      value: widget.lockController.enabled,
+                      onChanged: _busy ? null : _toggleLock,
+                    ),
+                    ListTile(
+                      leading:
+                          _iconBadge(context, Icons.screen_lock_portrait_rounded),
+                      title: const Text(
+                        'Screenshots blocked',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: const Text(
+                        'Codes are hidden from screenshots and recents',
+                      ),
+                    ),
+                  ]),
+                  _section(context, 'Appearance', [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: SegmentedButton<ThemeMode>(
+                        segments: const [
+                          ButtonSegment(
+                            value: ThemeMode.system,
+                            label: Text('System'),
+                            icon: Icon(Icons.brightness_auto_rounded),
+                          ),
+                          ButtonSegment(
+                            value: ThemeMode.light,
+                            label: Text('Light'),
+                            icon: Icon(Icons.light_mode_rounded),
+                          ),
+                          ButtonSegment(
+                            value: ThemeMode.dark,
+                            label: Text('Dark'),
+                            icon: Icon(Icons.dark_mode_rounded),
+                          ),
+                        ],
+                        selected: {widget.themeController.mode},
+                        onSelectionChanged: (s) =>
+                            widget.themeController.setMode(s.first),
+                      ),
+                    ),
+                  ]),
+                  _section(context, 'Backup & restore', [
+                    _tile(
+                      context,
+                      icon: Icons.save_alt_rounded,
+                      title: 'Export backup to file',
+                      subtitle: 'Save a password-encrypted .authly file',
+                      onTap: () => _export(share: false),
+                    ),
+                    _tile(
+                      context,
+                      icon: Icons.ios_share_rounded,
+                      title: 'Share encrypted backup',
+                      subtitle: 'Send the .authly file via the share sheet',
+                      onTap: () => _export(share: true),
+                    ),
+                    _tile(
+                      context,
+                      icon: Icons.folder_open_rounded,
+                      title: 'Import backup from file',
+                      onTap: _importFromFile,
+                    ),
+                    _tile(
+                      context,
+                      icon: Icons.content_paste_rounded,
+                      title: 'Import backup from clipboard',
+                      onTap: _importFromClipboard,
+                    ),
+                  ]),
+                  _section(context, 'About', [
+                    _tile(
+                      context,
+                      icon: Icons.info_rounded,
+                      title: 'Authly 1.0.0',
+                      subtitle: 'Offline-first • Zero tracking • Open and private',
+                    ),
+                  ]),
                 ],
               ),
               if (_busy)
@@ -339,9 +452,10 @@ class _PasswordDialogState extends State<_PasswordDialog> {
               controller: _password,
               obscureText: true,
               autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Backup password',
-                border: OutlineInputBorder(),
+              decoration: AppTheme.inputDecoration(
+                context,
+                label: 'Backup password',
+                icon: Icons.lock_rounded,
               ),
             ),
             if (widget.confirm) ...[
@@ -349,9 +463,10 @@ class _PasswordDialogState extends State<_PasswordDialog> {
               TextField(
                 controller: _confirm,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Confirm password',
-                  border: OutlineInputBorder(),
+                decoration: AppTheme.inputDecoration(
+                  context,
+                  label: 'Confirm password',
+                  icon: Icons.lock_rounded,
                 ),
               ),
             ],

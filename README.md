@@ -11,6 +11,15 @@ Authly is an offline-first, privacy-focused, zero-telemetry two-factor authentic
 - **Material 3 UI**: Polished Deep Navy dark mode and clean light theme with live countdown rings and haptic feedback.
 - **Zero Cloud Dependence**: 100% offline, zero network requests, zero ads, zero trackers.
 
+## Highlights
+
+- Premium blue Material 3 UI (light, dark, system) with gradient account avatars, live countdown rings and a "next code" preview in the last 5 seconds.
+- Add accounts by camera scan, **gallery QR image**, pasted `otpauth://` link, or manual entry.
+- Import a **Google Authenticator export** (`otpauth-migration://`) QR in one step.
+- Edit, remove (button or swipe), search, and hide/show codes.
+- Clipboard auto-clears 30 seconds after copying a code.
+- Biometric / device-credential app lock; screenshots and recents previews are blocked (`FLAG_SECURE`).
+
 ## Automated Builds with GitHub Actions
 
 The repository includes `.github/workflows/build.yml` configured to:
