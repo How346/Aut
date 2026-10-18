@@ -1,43 +1,24 @@
-# Authly — Professional Flutter Authenticator
+# Authly — Clean Authenticator UI
 
-Authly is an offline-first, privacy-focused, zero-telemetry two-factor authentication (2FA/TOTP) application built with Flutter, Material 3, and Android Keystore hardware-backed encryption.
+A Flutter-based, offline-first TOTP authenticator.
 
-## Key Features
+## UI refresh
+- Simplified Google Authenticator-inspired blue-and-white styling.
+- Added compact Home / Accounts / Settings bottom navigation.
+- Cleaner account cards with readable codes, countdown rings, copy action, and overflow menu for edit/remove.
+- Kept the shield-and-lock Authly brand asset.
+- Simplified Settings header while retaining security, appearance, encrypted backup export/import, and About options.
+- Existing account creation, QR scanning, gallery QR import, paste-link import, Google Authenticator migration, local storage, TOTP algorithms, biometric/device lock, and encrypted backup flows are retained.
 
-- **Standard TOTP Engine (RFC 6238 / RFC 4226)**: Supports SHA-1, SHA-256, SHA-512, 6 or 8 digits, 30s or 60s periods.
-- **Hardware-Backed Encryption**: Account secrets are stored securely via `flutter_secure_storage` utilizing the Android Keystore.
-- **QR Code Scanning**: High-speed camera scanner using `mobile_scanner` with torch toggle and camera switching.
-- **Encrypted Vault Backup & Restore**: Export and import password-protected, HMAC-authenticated backup files.
-- **Material 3 UI**: Polished Deep Navy dark mode and clean light theme with live countdown rings and haptic feedback.
-- **Zero Cloud Dependence**: 100% offline, zero network requests, zero ads, zero trackers.
+## Build
+Use Flutter stable and run:
 
-## Highlights
+```sh
+flutter pub get
+flutter analyze
+flutter build apk --debug
+```
 
-- Simple, professional light-blue Material 3 UI (light, dark, system).
-- Add accounts by camera scan, **gallery QR image**, pasted `otpauth://` link, or manual entry.
-- Import a Google Authenticator export (`otpauth-migration://`) QR.
-- Edit, remove (menu or swipe), search; tap a code to copy (clipboard clears after 30 s).
-- Biometric / device-credential app lock; screenshots are blocked (`FLAG_SECURE`).
+The repository includes `.github/workflows/build.yml` for GitHub Actions APK builds.
 
-## Automated Builds with GitHub Actions
-
-The repository includes `.github/workflows/build.yml` configured to:
-1. Use Flutter stable and Java 17.
-2. Analyze and test the codebase.
-3. Build both **Debug APK** and **Release APK**.
-4. Automatically publish the APKs as downloadable workflow artifacts.
-
-### How to Build Your APK on GitHub
-
-1. Push this repository to GitHub.
-2. Go to the **Actions** tab in your repository.
-3. Select **Authly Android CI** and trigger it via `Run workflow` (or simply push to `main`).
-4. Once completed, download the generated APK from the **Artifacts** section at the bottom of the run summary.
-
-## Backups
-
-Backups are `.authly` files: PBKDF2-HMAC-SHA256 (210,000 iterations, 32-byte salt) + AES-256-GCM (12-byte nonce, 16-byte tag). Keep the password safe; it cannot be recovered.
-
-## Local setup
-
-This archive has no Gradle wrapper jar or app icons. Run `flutter create . --platforms=android --project-name authly --org com.authly` once to generate them (existing files are kept), then `flutter run`.
+Note: This UI update has not been compiled in this environment; run the analyzer and build workflow to validate against your exact Flutter SDK.

@@ -168,17 +168,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Widget _header(BuildContext context, String title) {
+  Widget _section(BuildContext context, String title, List<Widget> tiles) {
+    final scheme = Theme.of(context).colorScheme;
+    final children = <Widget>[];
+    for (var i = 0; i < tiles.length; i++) {
+      if (i > 0) children.add(const Divider(indent: 16, endIndent: 16));
+      children.add(tiles[i]);
+    }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: Theme.of(context).colorScheme.primary,
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 6, bottom: 8),
+            child: Text(
+              title.toUpperCase(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+                color: scheme.primary,
+              ),
+            ),
+          ),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: children),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _iconBadge(BuildContext context, IconData icon) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: scheme.onPrimaryContainer, size: 22),
     );
   }
 
@@ -190,9 +222,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     VoidCallback? onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-      title: Text(title),
+      leading: _iconBadge(context, icon),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
       subtitle: subtitle == null ? null : Text(subtitle),
+      trailing: onTap == null ? null : const Icon(Icons.chevron_right_rounded),
       enabled: !_busy,
       onTap: onTap,
     );
@@ -200,7 +233,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListenableBuilder(
@@ -211,82 +243,129 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return Stack(
             children: [
               ListView(
-                padding: const EdgeInsets.only(bottom: 24),
+                padding: const EdgeInsets.only(bottom: 32),
                 children: [
-                  _header(context, 'Security'),
-                  SwitchListTile(
-                    secondary: Icon(Icons.fingerprint, color: scheme.primary),
-                    title: const Text('Biometric app lock'),
-                    subtitle: const Text('Ask to unlock on launch and resume'),
-                    value: widget.lockController.enabled,
-                    onChanged: _busy ? null : _toggleLock,
-                  ),
-                  _tile(
-                    context,
-                    icon: Icons.shield_outlined,
-                    title: 'Secure storage',
-                    subtitle: 'Secrets are kept in the Android Keystore',
-                  ),
-                  const Divider(),
-                  _header(context, 'Appearance'),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    child: SegmentedButton<ThemeMode>(
-                      segments: const [
-                        ButtonSegment(
-                          value: ThemeMode.system,
-                          label: Text('System'),
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 2),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Image.asset(
+                            'assets/authly_logo.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.shield_rounded,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
                         ),
-                        ButtonSegment(
-                          value: ThemeMode.light,
-                          label: Text('Light'),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.dark,
-                          label: Text('Dark'),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Privacy & security', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 3),
+                              Text('Your codes stay on this device.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                            ],
+                          ),
                         ),
                       ],
-                      selected: {widget.themeController.mode},
-                      onSelectionChanged: (s) =>
-                          widget.themeController.setMode(s.first),
                     ),
                   ),
-                  const Divider(),
-                  _header(context, 'Backup'),
-                  _tile(
-                    context,
-                    icon: Icons.save_alt,
-                    title: 'Export to file',
-                    subtitle: 'Save a password-encrypted .authly file',
-                    onTap: () => _export(share: false),
-                  ),
-                  _tile(
-                    context,
-                    icon: Icons.ios_share,
-                    title: 'Share backup',
-                    subtitle: 'Send the .authly file via the share sheet',
-                    onTap: () => _export(share: true),
-                  ),
-                  _tile(
-                    context,
-                    icon: Icons.folder_open,
-                    title: 'Import from file',
-                    onTap: _importFromFile,
-                  ),
-                  _tile(
-                    context,
-                    icon: Icons.content_paste,
-                    title: 'Import from clipboard',
-                    onTap: _importFromClipboard,
-                  ),
-                  const Divider(),
-                  _header(context, 'About'),
-                  _tile(
-                    context,
-                    icon: Icons.info_outline,
-                    title: 'Authly 1.0.0',
-                    subtitle: 'Offline-first, no tracking',
-                  ),
+                  _section(context, 'Security', [
+                    SwitchListTile(
+                      secondary: _iconBadge(context, Icons.fingerprint_rounded),
+                      title: const Text(
+                        'Biometric app lock',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle:
+                          const Text('Require unlock on launch and resume'),
+                      value: widget.lockController.enabled,
+                      onChanged: _busy ? null : _toggleLock,
+                    ),
+                    ListTile(
+                      leading:
+                          _iconBadge(context, Icons.screen_lock_portrait_rounded),
+                      title: const Text(
+                        'Screenshots blocked',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: const Text(
+                        'Codes are hidden from screenshots and recents',
+                      ),
+                    ),
+                  ]),
+                  _section(context, 'Appearance', [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: SegmentedButton<ThemeMode>(
+                        segments: const [
+                          ButtonSegment(
+                            value: ThemeMode.system,
+                            label: Text('System'),
+                            icon: Icon(Icons.brightness_auto_rounded),
+                          ),
+                          ButtonSegment(
+                            value: ThemeMode.light,
+                            label: Text('Light'),
+                            icon: Icon(Icons.light_mode_rounded),
+                          ),
+                          ButtonSegment(
+                            value: ThemeMode.dark,
+                            label: Text('Dark'),
+                            icon: Icon(Icons.dark_mode_rounded),
+                          ),
+                        ],
+                        selected: {widget.themeController.mode},
+                        onSelectionChanged: (s) =>
+                            widget.themeController.setMode(s.first),
+                      ),
+                    ),
+                  ]),
+                  _section(context, 'Backup & restore', [
+                    _tile(
+                      context,
+                      icon: Icons.save_alt_rounded,
+                      title: 'Export backup to file',
+                      subtitle: 'Save a password-encrypted .authly file',
+                      onTap: () => _export(share: false),
+                    ),
+                    _tile(
+                      context,
+                      icon: Icons.ios_share_rounded,
+                      title: 'Share encrypted backup',
+                      subtitle: 'Send the .authly file via the share sheet',
+                      onTap: () => _export(share: true),
+                    ),
+                    _tile(
+                      context,
+                      icon: Icons.folder_open_rounded,
+                      title: 'Import backup from file',
+                      onTap: _importFromFile,
+                    ),
+                    _tile(
+                      context,
+                      icon: Icons.content_paste_rounded,
+                      title: 'Import backup from clipboard',
+                      onTap: _importFromClipboard,
+                    ),
+                  ]),
+                  _section(context, 'About', [
+                    _tile(
+                      context,
+                      icon: Icons.info_rounded,
+                      title: 'Authly 1.0.0',
+                      subtitle: 'Offline-first • Zero tracking • Open and private',
+                    ),
+                  ]),
                 ],
               ),
               if (_busy)
