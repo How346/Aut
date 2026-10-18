@@ -121,7 +121,7 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
     setState(() => _isSaving = true);
     final issuer = _issuerController.text.trim();
     final account = TotpAccount(
-      id: const Uuid().v4(),
+      id: Uuid().v4(),
       accountName: _accountController.text.trim(),
       issuer: issuer.isNotEmpty ? issuer : 'Custom Account',
       secret: TotpService.normalizeSecret(_secretController.text),
@@ -168,7 +168,7 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Add a new account',
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: scheme.onSurface,

@@ -145,7 +145,7 @@ class TotpService {
       generateCodeForStep(secret: normalizedSecret, timeStep: 0, digits: digits, algorithm: algorithm);
 
       return TotpAccount(
-        id: const Uuid().v4(),
+        id: Uuid().v4(),
         accountName: accountName.trim(),
         issuer: issuer.isNotEmpty ? issuer : 'Authenticator',
         secret: normalizedSecret,
