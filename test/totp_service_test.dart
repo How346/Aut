@@ -28,7 +28,7 @@ void main() {
 
   group('RFC 6238 test vectors', () {
     for (final entry in vectors.entries) {
-      final algorithms = TotpAlgorithm.values;
+      const algorithms = TotpAlgorithm.values;
       for (var i = 0; i < algorithms.length; i++) {
         final algo = algorithms[i];
         test('T=${entry.key} ${algo.name}', () {
