@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  static const Color brand = Color(0xFF2563EB);
-  static const Color brandDeep = Color(0xFF1D4ED8);
-  static const Color brandLight = Color(0xFF5B9DFF);
-  static const Color accent = Color(0xFF22D3EE);
-  static const Color navyDeep = Color(0xFF070D1F);
+  static const Color brand = Color(0xFF1A73E8);
+  static const Color brandDeep = Color(0xFF1967D2);
+  static const Color brandLight = Color(0xFF8AB4F8);
+  static const Color accent = Color(0xFF8AB4F8);
+  static const Color navyDeep = Color(0xFF101318);
 
   static const LinearGradient brandGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF3B82F6), Color(0xFF1E3A8A)],
+    colors: [Color(0xFF4285F4), Color(0xFF1967D2)],
   );
 
   static const List<List<Color>> avatarGradients = [
@@ -73,18 +73,18 @@ class AppTheme {
       onPrimaryContainer:
           dark ? const Color(0xFFCFE0FF) : const Color(0xFF0B2A8A),
       secondary: dark ? accent : const Color(0xFF0891B2),
-      surface: dark ? const Color(0xFF0E1731) : Colors.white,
-      onSurface: dark ? const Color(0xFFE8EEFF) : const Color(0xFF0B1230),
+      surface: dark ? const Color(0xFF1E1F20) : Colors.white,
+      onSurface: dark ? const Color(0xFFE8EAED) : const Color(0xFF202124),
       onSurfaceVariant:
-          dark ? const Color(0xFF9AA8D1) : const Color(0xFF5B678F),
+          dark ? const Color(0xFFBDC1C6) : const Color(0xFF5F6368),
       surfaceContainerHighest:
-          dark ? const Color(0xFF1A2548) : const Color(0xFFE8EEFF),
-      outline: dark ? const Color(0xFF3A4A80) : const Color(0xFF9AA8D1),
-      outlineVariant: dark ? const Color(0xFF22305C) : const Color(0xFFD9E2FA),
+          dark ? const Color(0xFF303134) : const Color(0xFFF1F3F4),
+      outline: dark ? const Color(0xFF5F6368) : const Color(0xFFDADCE0),
+      outlineVariant: dark ? const Color(0xFF3C4043) : const Color(0xFFE8EAED),
       error: dark ? const Color(0xFFFF6B7A) : const Color(0xFFDC2626),
     );
 
-    final scaffold = dark ? navyDeep : const Color(0xFFF3F6FF);
+    final scaffold = dark ? navyDeep : const Color(0xFFF8F9FA);
 
     return ThemeData(
       useMaterial3: true,
@@ -110,7 +110,7 @@ class AppTheme {
         margin: EdgeInsets.zero,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: scheme.outlineVariant),
         ),
       ),
@@ -137,7 +137,7 @@ class AppTheme {
           fontSize: 15,
           fontWeight: FontWeight.w700,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,

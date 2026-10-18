@@ -186,17 +186,26 @@ class _HomeScreenState extends State<HomeScreen> {
     final scheme = theme.colorScheme;
     final count = _accounts.length;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
+      padding: const EdgeInsets.fromLTRB(20, 14, 8, 8),
       child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: AppTheme.brandGradient,
-              borderRadius: BorderRadius.circular(14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(
+              'assets/authly_logo.png',
+              width: 44,
+              height: 44,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: scheme.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.lock_rounded, color: Colors.white),
+              ),
             ),
-            child: const Icon(Icons.shield_rounded, color: Colors.white),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -212,8 +221,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Text(
                   count == 0
-                      ? 'Offline • Private • Secure'
-                      : '$count account${count == 1 ? '' : 's'} • Offline & encrypted',
+                      ? 'Your codes, safely on this device'
+                      : '$count account${count == 1 ? '' : 's'} • Stored securely',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
@@ -242,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSearch(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: TextField(
         controller: _searchController,
         textInputAction: TextInputAction.search,
@@ -287,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } else {
       body = ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
         itemCount: accounts.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
@@ -573,18 +582,11 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 110,
-              height: 110,
-              decoration: const BoxDecoration(
-                gradient: AppTheme.brandGradient,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.verified_user_rounded,
-                size: 54,
-                color: Colors.white,
-              ),
+            Image.asset(
+              'assets/authly_logo.png',
+              width: 104,
+              height: 104,
+              fit: BoxFit.contain,
             ),
             const SizedBox(height: 24),
             Text(
@@ -595,7 +597,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Scan a QR code, pick one from your gallery, or enter a key to start generating secure one-time codes.',
+              'Add an account to generate secure verification codes. Your accounts stay on this device.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
