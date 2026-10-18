@@ -152,83 +152,49 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Add account')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: AppTheme.brandGradient,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Add a new account',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _QuickAction(
+                      icon: Icons.qr_code_scanner,
+                      label: 'Scan',
+                      onTap: _scanQr,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Scan a QR code, pick one from your gallery, paste a link, or type the key.',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 13,
-                      ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _QuickAction(
+                      icon: Icons.photo_library_outlined,
+                      label: 'Gallery',
+                      onTap: _pickFromGallery,
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _QuickAction(
-                            icon: Icons.qr_code_scanner_rounded,
-                            label: 'Scan',
-                            onTap: _scanQr,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _QuickAction(
-                            icon: Icons.photo_library_rounded,
-                            label: 'Gallery',
-                            onTap: _pickFromGallery,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _QuickAction(
-                            icon: Icons.link_rounded,
-                            label: 'Paste link',
-                            onTap: _pasteLink,
-                          ),
-                        ),
-                      ],
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _QuickAction(
+                      icon: Icons.link,
+                      label: 'Paste link',
+                      onTap: _pasteLink,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 22),
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Row(
                   children: [
                     const Expanded(child: Divider()),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        'OR ENTER MANUALLY',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
-                          color: scheme.onSurfaceVariant,
-                        ),
+                        'or enter manually',
+                        style: TextStyle(color: scheme.onSurfaceVariant),
                       ),
                     ),
                     const Expanded(child: Divider()),
@@ -243,7 +209,7 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
                   context,
                   label: 'Service / issuer',
                   hint: 'e.g. GitHub, Google, AWS',
-                  icon: Icons.business_rounded,
+                  icon: Icons.business_outlined,
                 ),
               ),
               const SizedBox(height: 14),
@@ -255,7 +221,7 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
                   context,
                   label: 'Account name or email',
                   hint: 'e.g. user@example.com',
-                  icon: Icons.person_rounded,
+                  icon: Icons.person_outline,
                 ),
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) {
@@ -275,7 +241,7 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
                   context,
                   label: 'Secret key (Base32)',
                   hint: 'e.g. JBSWY3DPEHPK3PXP',
-                  icon: Icons.key_rounded,
+                  icon: Icons.key_outlined,
                   suffix: IconButton(
                     tooltip: _hideSecret ? 'Show key' : 'Hide key',
                     icon: Icon(
@@ -400,26 +366,27 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Material(
-      color: Colors.white.withValues(alpha: 0.16),
-      borderRadius: BorderRadius.circular(16),
+      color: scheme.primaryContainer,
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 14),
           child: Column(
             children: [
-              Icon(icon, color: Colors.white, size: 28),
+              Icon(icon, color: scheme.onPrimaryContainer),
               const SizedBox(height: 6),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
+                style: TextStyle(
+                  color: scheme.onPrimaryContainer,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],

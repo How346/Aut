@@ -87,61 +87,24 @@ class _LockOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Positioned.fill(
       child: Material(
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF1E3A8A), AppTheme.navyDeep],
-            ),
-          ),
-          child: SafeArea(
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.lock_rounded,
-                      size: 48,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Authly is locked',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Authenticate to view your codes',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  const SizedBox(height: 28),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppTheme.brandDeep,
-                    ),
-                    onPressed: onUnlock,
-                    icon: const Icon(Icons.fingerprint_rounded),
-                    label: const Text('Unlock'),
-                  ),
-                ],
+        color: theme.scaffoldBackgroundColor,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock_outline, size: 64, color: theme.colorScheme.primary),
+              const SizedBox(height: 16),
+              Text('Authly is locked', style: theme.textTheme.titleLarge),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: onUnlock,
+                icon: const Icon(Icons.fingerprint),
+                label: const Text('Unlock'),
               ),
-            ),
+            ],
           ),
         ),
       ),
