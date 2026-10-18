@@ -215,7 +215,13 @@ class _AccountCard extends StatelessWidget {
               Text(account.accountName, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
             ])),
             PopupMenuButton<_CardAction>(tooltip: 'Account options', padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 44),
-              icon: Icon(Icons.more_horiz_rounded, color: scheme.onSurfaceVariant), onSelected: (a) { if (a == _CardAction.edit) onEdit(); else onDelete(); },
+              icon: Icon(Icons.more_horiz_rounded, color: scheme.onSurfaceVariant), onSelected: (a) {
+                if (a == _CardAction.edit) {
+                  onEdit();
+                } else {
+                  onDelete();
+                }
+              },
               itemBuilder: (_) => const [PopupMenuItem(value: _CardAction.edit, child: Text('Edit account')), PopupMenuItem(value: _CardAction.delete, child: Text('Remove account'))]),
           ]),
           const SizedBox(height: 15),
