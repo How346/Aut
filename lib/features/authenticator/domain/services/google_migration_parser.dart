@@ -113,7 +113,7 @@ class GoogleMigrationParser {
     }
 
     return TotpAccount(
-      id: Uuid().v4(),
+      id: const Uuid().v4(),
       accountName: accountName.isEmpty ? 'Account' : accountName,
       issuer: issuerName.isEmpty ? 'Authenticator' : issuerName,
       secret: base32.encode(secret).replaceAll('=', ''),

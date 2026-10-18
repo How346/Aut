@@ -121,7 +121,7 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
     setState(() => _isSaving = true);
     final issuer = _issuerController.text.trim();
     final account = TotpAccount(
-      id: Uuid().v4(),
+      id: const Uuid().v4(),
       accountName: _accountController.text.trim(),
       issuer: issuer.isNotEmpty ? issuer : 'Custom Account',
       secret: TotpService.normalizeSecret(_secretController.text),
