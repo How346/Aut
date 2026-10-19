@@ -15,7 +15,6 @@ class ThemeScreen extends StatelessWidget {
       body: ListenableBuilder(
         listenable: controller,
         builder: (context, _) {
-          final scheme = Theme.of(context).colorScheme;
           final mode = controller.mode;
           final system = mode == ThemeMode.system;
 
