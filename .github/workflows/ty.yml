@@ -1,0 +1,210 @@
+name: Authly Secure Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "index.html"
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install build tools
+        run: |
+          npm install --no-save --no-package-lock \
+            javascript-obfuscator \
+            cheerio \
+            html-minifier-terser
+
+      - name: Validate input
+        shell: bash
+        run: |
+          test -s index.html || {
+            echo "ERROR: index.html is missing or empty."
+            exit 1
+          }
+
+          if [ -z "${SOURCE_BACKUP_PASSWORD:-}" ]; then
+            echo "ERROR: SOURCE_BACKUP_PASSWORD secret is missing."
+            exit 1
+          fi
+        env:
+          SOURCE_BACKUP_PASSWORD: ${{ secrets.SOURCE_BACKUP_PASSWORD }}
+
+      - name: Create source copy
+        run: |
+          mkdir -p dist
+          cp index.html dist/source.html
+
+      - name: Obfuscate website HTML
+        shell: bash
+        run: |
+          cat > /tmp/build.mjs <<'NODE'
+          import fs from "node:fs";
+          import * as cheerio from "cheerio";
+          import JavaScriptObfuscator from "javascript-obfuscator";
+          import { minify } from "html-minifier-terser";
+
+          const input = fs.readFileSync("index.html", "utf8");
+          const $ = cheerio.load(input, {
+            decodeEntities: false
+          });
+
+          let count = 0;
+
+          $("script").each((_, element) => {
+            const script = $(element);
+            const src = script.attr("src");
+            const type = (script.attr("type") || "").toLowerCase();
+
+            // Preserve external scripts and JSON/data scripts.
+            if (src || (type && type !== "text/javascript"
+                && type !== "application/javascript"
+                && type !== "module")) {
+              return;
+            }
+
+            const original = script.html();
+
+            if (!original || !original.trim()) return;
+
+            try {
+              const result = JavaScriptObfuscator.obfuscate(
+                original,
+                {
+                  compact: true,
+                  stringArray: true,
+                  stringArrayThreshold: 0.65,
+                  identifierNamesGenerator: "hexadecimal",
+                  renameGlobals: false,
+                  controlFlowFlattening: false,
+                  deadCodeInjection: false,
+                  selfDefending: false,
+                  unicodeEscapeSequence: false
+                }
+              );
+
+              script.text(result.getObfuscatedCode());
+              count++;
+            } catch (error) {
+              console.error("Could not obfuscate inline script:", error.message);
+              process.exitCode = 1;
+            }
+          });
+
+          if (process.exitCode) process.exit(1);
+
+          const html = $.html();
+
+          const output = await minify(html, {
+            collapseWhitespace: true,
+            removeComments: true,
+            removeRedundantAttributes: true,
+            removeScriptTypeAttributes: false,
+            removeStyleLinkTypeAttributes: true,
+            minifyCSS: true,
+            minifyJS: false
+          });
+
+          fs.writeFileSync("dist/website.html", output);
+
+          console.log(`Obfuscated ${count} inline JavaScript block(s).`);
+          console.log("Website generated: dist/website.html");
+          NODE
+
+          node /tmp/build.mjs
+
+      - name: Encrypt original source
+        env:
+          SOURCE_BACKUP_PASSWORD: ${{ secrets.SOURCE_BACKUP_PASSWORD }}
+        run: |
+          cat > /tmp/encrypt.mjs <<'NODE'
+          import fs from "node:fs";
+          import crypto from "node:crypto";
+
+          const password = process.env.SOURCE_BACKUP_PASSWORD;
+
+          if (!password || password.length < 8) {
+            throw new Error(
+              "SOURCE_BACKUP_PASSWORD must contain at least 8 characters."
+            );
+          }
+
+          const input = fs.readFileSync("index.html");
+
+          const salt = crypto.randomBytes(16);
+          const iv = crypto.randomBytes(12);
+
+          const key = crypto.pbkdf2Sync(
+            password,
+            salt,
+            600000,
+            32,
+            "sha256"
+          );
+
+          const cipher = crypto.createCipheriv(
+            "aes-256-gcm",
+            key,
+            iv
+          );
+
+          const ciphertext = Buffer.concat([
+            cipher.update(input),
+            cipher.final()
+          ]);
+
+          const tag = cipher.getAuthTag();
+
+          // Format: magic (8) + salt (16) + IV (12)
+          //         + authentication tag (16) + ciphertext
+          const magic = Buffer.from("AUTHLY01");
+
+          const encrypted = Buffer.concat([
+            magic,
+            salt,
+            iv,
+            tag,
+            ciphertext
+          ]);
+
+          fs.writeFileSync(
+            "dist/authly-source.enc",
+            encrypted
+          );
+
+          console.log("Encrypted source backup created.");
+          NODE
+
+          node /tmp/encrypt.mjs
+
+      - name: Verify generated files
+        run: |
+          test -s dist/source.html
+          test -s dist/website.html
+          test -s dist/authly-source.enc
+
+          echo "All three output files exist."
+          ls -lh dist/
+
+      - name: Upload all three files
+        uses: actions/upload-artifact@v4
+        with:
+          name: Authly-Secure-Build
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
