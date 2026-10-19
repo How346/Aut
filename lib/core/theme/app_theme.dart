@@ -3,34 +3,36 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  static const Color brand = Color(0xFF1A73E8);
-  static const Color brandDeep = Color(0xFF1967D2);
-  static const Color brandLight = Color(0xFF8AB4F8);
-  static const Color accent = Color(0xFF8AB4F8);
-  static const Color navyDeep = Color(0xFF101318);
-
-  static const LinearGradient brandGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFF4285F4), Color(0xFF1967D2)],
-  );
-
-  static const List<List<Color>> avatarGradients = [
-    [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
-    [Color(0xFF06B6D4), Color(0xFF0E7490)],
-    [Color(0xFF6366F1), Color(0xFF4338CA)],
-    [Color(0xFF0EA5E9), Color(0xFF0369A1)],
-    [Color(0xFF8B5CF6), Color(0xFF5B21B6)],
-    [Color(0xFF14B8A6), Color(0xFF0F766E)],
+  /// Selectable accent colours (first one is the default blue).
+  static const List<Color> accents = [
+    Color(0xFF1565E8),
+    Color(0xFF8B5CF6),
+    Color(0xFF14A37F),
+    Color(0xFFF97316),
+    Color(0xFFEC4899),
   ];
 
-  static ThemeData get lightTheme => _build(Brightness.light);
-  static ThemeData get darkTheme => _build(Brightness.dark);
+  static ThemeData light(Color accent) => _build(Brightness.light, accent);
+  static ThemeData dark(Color accent) => _build(Brightness.dark, accent);
 
-  /// Shared, premium-looking text field decoration.
+  /// Blue hero gradient used on splash, PIN and detail screens.
+  /// The raw accent colour is exposed as `colorScheme.secondary`.
+  static LinearGradient hero(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.secondary;
+    return LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        Color.lerp(accent, Colors.white, 0.06)!,
+        Color.lerp(accent, Colors.black, 0.34)!,
+      ],
+    );
+  }
+
+  /// Shared text field decoration.
   static InputDecoration inputDecoration(
     BuildContext context, {
-    required String label,
+    String? label,
     String? hint,
     IconData? icon,
     Widget? suffix,
@@ -38,7 +40,7 @@ class AppTheme {
     final scheme = Theme.of(context).colorScheme;
     OutlineInputBorder border(Color color, [double width = 1]) {
       return OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: color, width: width),
       );
     }
@@ -50,47 +52,49 @@ class AppTheme {
       suffixIcon: suffix,
       filled: true,
       fillColor: scheme.surface,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: border(scheme.outlineVariant),
       enabledBorder: border(scheme.outlineVariant),
-      focusedBorder: border(scheme.primary, 1.8),
+      focusedBorder: border(scheme.primary, 1.6),
       errorBorder: border(scheme.error),
-      focusedErrorBorder: border(scheme.error, 1.8),
+      focusedErrorBorder: border(scheme.error, 1.6),
     );
   }
 
-  static ThemeData _build(Brightness brightness) {
+  static ThemeData _build(Brightness brightness, Color accent) {
     final dark = brightness == Brightness.dark;
+    const navy = Color(0xFF0B1220);
+
+    final primary = dark ? Color.lerp(accent, Colors.white, 0.25)! : accent;
 
     final scheme = ColorScheme.fromSeed(
-      seedColor: brand,
+      seedColor: accent,
       brightness: brightness,
     ).copyWith(
-      primary: dark ? brandLight : brandDeep,
-      onPrimary: dark ? const Color(0xFF04122E) : Colors.white,
-      primaryContainer:
-          dark ? const Color(0xFF16275A) : const Color(0xFFDCE7FF),
-      onPrimaryContainer:
-          dark ? const Color(0xFFCFE0FF) : const Color(0xFF0B2A8A),
-      secondary: dark ? accent : const Color(0xFF0891B2),
-      surface: dark ? const Color(0xFF1E1F20) : Colors.white,
-      onSurface: dark ? const Color(0xFFE8EAED) : const Color(0xFF202124),
+      primary: primary,
+      onPrimary: dark ? navy : Colors.white,
+      secondary: accent,
+      onSecondary: Colors.white,
+      primaryContainer: dark
+          ? Color.lerp(accent, navy, 0.72)!
+          : Color.lerp(accent, Colors.white, 0.88)!,
+      onPrimaryContainer: dark
+          ? Color.lerp(accent, Colors.white, 0.75)!
+          : Color.lerp(accent, Colors.black, 0.3)!,
+      surface: dark ? const Color(0xFF131C30) : Colors.white,
+      onSurface: dark ? const Color(0xFFE6ECF7) : const Color(0xFF101828),
       onSurfaceVariant:
-          dark ? const Color(0xFFBDC1C6) : const Color(0xFF5F6368),
+          dark ? const Color(0xFF93A1BC) : const Color(0xFF667085),
       surfaceContainerHighest:
-          dark ? const Color(0xFF303134) : const Color(0xFFF1F3F4),
-      outline: dark ? const Color(0xFF5F6368) : const Color(0xFFDADCE0),
-      outlineVariant: dark ? const Color(0xFF3C4043) : const Color(0xFFE8EAED),
-      error: dark ? const Color(0xFFFF6B7A) : const Color(0xFFDC2626),
+          dark ? const Color(0xFF1B2740) : const Color(0xFFEAF0FA),
+      outlineVariant: dark ? const Color(0xFF223049) : const Color(0xFFE3EAF6),
+      error: dark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
     );
-
-    final scaffold = dark ? navyDeep : const Color(0xFFF8F9FA);
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: scaffold,
+      scaffoldBackgroundColor: dark ? navy : const Color(0xFFF6F9FF),
       appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: false,
@@ -100,7 +104,7 @@ class AppTheme {
         scrolledUnderElevation: 0,
         titleTextStyle: TextStyle(
           color: scheme.onSurface,
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -110,40 +114,35 @@ class AppTheme {
         margin: EdgeInsets.zero,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           side: BorderSide(color: scheme.outlineVariant),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(64, 52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          minimumSize: const Size(64, 50),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(64, 52),
-          side: BorderSide(color: scheme.outlineVariant),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          minimumSize: const Size(64, 46),
+          foregroundColor: scheme.primary,
+          side: BorderSide(color: scheme.primary, width: 1.2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
+        backgroundColor: scheme.secondary,
+        foregroundColor: Colors.white,
         elevation: 3,
-        extendedTextStyle: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: const CircleBorder(),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: dark ? const Color(0xFF1A2548) : const Color(0xFF0B1230),
-        contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       dividerTheme: DividerThemeData(
         color: scheme.outlineVariant,

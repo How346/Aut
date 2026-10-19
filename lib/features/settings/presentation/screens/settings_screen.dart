@@ -1,484 +1,201 @@
-import 'dart:convert';
-
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/settings/app_settings.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../authenticator/data/repositories/secure_account_repository.dart';
-import '../../../backup/domain/services/backup_service.dart';
 import '../../../security/app_lock_controller.dart';
+import '../../../security/lock_actions.dart';
+import '../widgets/settings_widgets.dart';
+import 'about_screen.dart';
+import 'export_import_screen.dart';
+import 'privacy_screen.dart';
+import 'theme_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
-  final SecureAccountRepository repository;
-  final ThemeController themeController;
-  final AppLockController lockController;
-  final Future<void> Function() onDataRestored;
-
   const SettingsScreen({
     super.key,
     required this.repository,
     required this.themeController,
     required this.lockController,
-    required this.onDataRestored,
+    required this.settings,
+    required this.onDataChanged,
   });
+
+  final SecureAccountRepository repository;
+  final ThemeController themeController;
+  final AppLockController lockController;
+  final AppSettings settings;
+  final Future<void> Function() onDataChanged;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _busy = false;
+  bool _biometricsSupported = true;
 
-  void _toast(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+  @override
+  void initState() {
+    super.initState();
+    widget.lockController.biometricsSupported().then((value) {
+      if (mounted) setState(() => _biometricsSupported = value);
+    });
   }
 
-  Future<String?> _askPassword({
-    required String title,
-    required String message,
-    required String action,
-    bool confirm = false,
-  }) {
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => _PasswordDialog(
-        title: title,
-        message: message,
-        action: action,
-        confirm: confirm,
-      ),
-    );
-  }
-
-  Future<void> _export({required bool share}) async {
-    final accounts = await widget.repository.getAccounts();
-    if (accounts.isEmpty) {
-      _toast('No accounts to export.');
-      return;
-    }
-    if (!mounted) return;
-    final password = await _askPassword(
-      title: 'Export Encrypted Backup',
-      message:
-          'Choose a password (min ${BackupService.minPasswordLength} characters). '
-          'You will need it to restore. It cannot be recovered.',
-      action: 'Export',
-      confirm: true,
-    );
-    if (password == null) return;
-
-    setState(() => _busy = true);
-    try {
-      final backup = await BackupService.createEncryptedBackup(
-        accounts: accounts,
-        password: password,
-      );
-      final bytes = Uint8List.fromList(utf8.encode(backup));
-      const fileName = 'authly-backup.authly';
-      if (share) {
-        await Share.shareXFiles(
-          [XFile.fromData(bytes, mimeType: 'application/octet-stream')],
-          fileNameOverrides: [fileName],
-          subject: 'Authly Encrypted Backup',
-        );
-      } else {
-        final path = await FilePicker.platform.saveFile(
-          dialogTitle: 'Save Authly backup',
-          fileName: fileName,
-          bytes: bytes,
-        );
-        if (path != null) _toast('Backup saved.');
-      }
-    } catch (e) {
-      _toast('Export failed: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
+  String get _themeLabel {
+    switch (widget.themeController.mode) {
+      case ThemeMode.system:
+        return 'System';
+      case ThemeMode.light:
+        return 'Light';
+      case ThemeMode.dark:
+        return 'Dark';
     }
   }
 
-  Future<void> _importFromFile() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-        withData: true,
-      );
-      final bytes = result?.files.single.bytes;
-      if (bytes == null) return;
-      await _restore(utf8.decode(bytes));
-    } on FormatException {
-      _toast('That file is not a valid Authly backup.');
-    } catch (e) {
-      _toast('Import failed: $e');
-    }
-  }
-
-  Future<void> _importFromClipboard() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = data?.text?.trim() ?? '';
-    if (text.isEmpty) {
-      _toast('Clipboard is empty.');
-      return;
-    }
-    await _restore(text);
-  }
-
-  Future<void> _restore(String backupJson) async {
-    if (!mounted) return;
-    final password = await _askPassword(
-      title: 'Import Backup',
-      message: 'Enter the password used to encrypt this backup.',
-      action: 'Restore',
-    );
-    if (password == null) return;
-
-    setState(() => _busy = true);
-    try {
-      final accounts = await BackupService.restoreBackup(
-        backupJson: backupJson,
-        password: password,
-      );
-      final added = await widget.repository.mergeAccounts(accounts);
-      await widget.onDataRestored();
-      final skipped = accounts.length - added;
-      _toast(
-        'Imported $added account${added == 1 ? '' : 's'}'
-        '${skipped > 0 ? ' ($skipped duplicate${skipped == 1 ? '' : 's'} skipped)' : ''}.',
-      );
-    } on BackupException catch (e) {
-      _toast(e.message);
-    } catch (e) {
-      _toast('Failed to restore: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _toggleLock(bool value) async {
-    final ok = await widget.lockController.setEnabled(value);
-    if (!ok) {
-      _toast(value
-          ? 'Biometric / device credential unavailable or not confirmed.'
-          : 'Could not change app lock.');
-    }
-  }
-
-  Widget _section(BuildContext context, String title, List<Widget> tiles) {
-    final scheme = Theme.of(context).colorScheme;
-    final children = <Widget>[];
-    for (var i = 0; i < tiles.length; i++) {
-      if (i > 0) children.add(const Divider(indent: 16, endIndent: 16));
-      children.add(tiles[i]);
-    }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 6, bottom: 8),
-            child: Text(
-              title.toUpperCase(),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.1,
-                color: scheme.primary,
-              ),
-            ),
-          ),
-          Card(
-            clipBehavior: Clip.antiAlias,
-            child: Column(children: children),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _iconBadge(BuildContext context, IconData icon) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Icon(icon, color: scheme.onPrimaryContainer, size: 22),
-    );
-  }
-
-  Widget _tile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    String? subtitle,
-    VoidCallback? onTap,
-  }) {
-    return ListTile(
-      leading: _iconBadge(context, icon),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: subtitle == null ? null : Text(subtitle),
-      trailing: onTap == null ? null : const Icon(Icons.chevron_right_rounded),
-      enabled: !_busy,
-      onTap: onTap,
-    );
+  void _push(Widget screen) {
+    Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
   }
 
   @override
   Widget build(BuildContext context) {
+    final lock = widget.lockController;
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Settings'),
+      ),
       body: ListenableBuilder(
         listenable: Listenable.merge(
-          [widget.themeController, widget.lockController],
+          [widget.themeController, lock, widget.settings],
         ),
         builder: (context, _) {
-          return Stack(
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 24),
             children: [
-              ListView(
-                padding: const EdgeInsets.only(bottom: 32),
+              SettingsGroup(
+                title: 'Security',
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 2),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Image.asset(
-                            'assets/authly_logo.png',
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => Icon(
-                              Icons.shield_rounded,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Privacy & security', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 3),
-                              Text('Your codes stay on this device.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                            ],
-                          ),
-                        ),
-                      ],
+                  SettingsRow(
+                    icon: Icons.lock_outline,
+                    title: 'App Lock',
+                    trailing: Switch(
+                      value: lock.enabled,
+                      onChanged: (v) =>
+                          LockActions.toggleAppLock(context, lock, v),
                     ),
                   ),
-                  _section(context, 'Security', [
-                    SwitchListTile(
-                      secondary: _iconBadge(context, Icons.fingerprint_rounded),
-                      title: const Text(
-                        'Biometric app lock',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      subtitle:
-                          const Text('Require unlock on launch and resume'),
-                      value: widget.lockController.enabled,
-                      onChanged: _busy ? null : _toggleLock,
+                  SettingsRow(
+                    icon: Icons.password_outlined,
+                    title: 'Change PIN',
+                    trailing: SettingsRow.chevron(context),
+                    onTap: () => LockActions.changePin(context, lock),
+                  ),
+                  SettingsRow(
+                    icon: Icons.fingerprint,
+                    title: 'Biometric Authentication',
+                    enabled: lock.enabled && _biometricsSupported,
+                    trailing: Switch(
+                      value: lock.biometricEnabled,
+                      onChanged: (lock.enabled && _biometricsSupported)
+                          ? (v) => LockActions.toggleBiometric(context, lock, v)
+                          : null,
                     ),
-                    ListTile(
-                      leading:
-                          _iconBadge(context, Icons.screen_lock_portrait_rounded),
-                      title: const Text(
-                        'Screenshots blocked',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      subtitle: const Text(
-                        'Codes are hidden from screenshots and recents',
-                      ),
-                    ),
-                  ]),
-                  _section(context, 'Appearance', [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: SegmentedButton<ThemeMode>(
-                        segments: const [
-                          ButtonSegment(
-                            value: ThemeMode.system,
-                            label: Text('System'),
-                            icon: Icon(Icons.brightness_auto_rounded),
-                          ),
-                          ButtonSegment(
-                            value: ThemeMode.light,
-                            label: Text('Light'),
-                            icon: Icon(Icons.light_mode_rounded),
-                          ),
-                          ButtonSegment(
-                            value: ThemeMode.dark,
-                            label: Text('Dark'),
-                            icon: Icon(Icons.dark_mode_rounded),
-                          ),
-                        ],
-                        selected: {widget.themeController.mode},
-                        onSelectionChanged: (s) =>
-                            widget.themeController.setMode(s.first),
-                      ),
-                    ),
-                  ]),
-                  _section(context, 'Backup & restore', [
-                    _tile(
-                      context,
-                      icon: Icons.save_alt_rounded,
-                      title: 'Export backup to file',
-                      subtitle: 'Save a password-encrypted .authly file',
-                      onTap: () => _export(share: false),
-                    ),
-                    _tile(
-                      context,
-                      icon: Icons.ios_share_rounded,
-                      title: 'Share encrypted backup',
-                      subtitle: 'Send the .authly file via the share sheet',
-                      onTap: () => _export(share: true),
-                    ),
-                    _tile(
-                      context,
-                      icon: Icons.folder_open_rounded,
-                      title: 'Import backup from file',
-                      onTap: _importFromFile,
-                    ),
-                    _tile(
-                      context,
-                      icon: Icons.content_paste_rounded,
-                      title: 'Import backup from clipboard',
-                      onTap: _importFromClipboard,
-                    ),
-                  ]),
-                  _section(context, 'About', [
-                    _tile(
-                      context,
-                      icon: Icons.info_rounded,
-                      title: 'Authly 1.0.0',
-                      subtitle: 'Offline-first • Zero tracking • Open and private',
-                    ),
-                  ]),
+                  ),
                 ],
               ),
-              if (_busy)
-                const Positioned.fill(
-                  child: ColoredBox(
-                    color: Color(0x66000000),
-                    child: Center(child: CircularProgressIndicator()),
+              SettingsGroup(
+                title: 'Appearance',
+                children: [
+                  SettingsRow(
+                    icon: Icons.brightness_6_outlined,
+                    title: 'Theme',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _themeLabel,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        SettingsRow.chevron(context),
+                      ],
+                    ),
+                    onTap: () => _push(
+                      ThemeScreen(controller: widget.themeController),
+                    ),
                   ),
-                ),
+                  SettingsRow(
+                    icon: Icons.palette_outlined,
+                    title: 'Accent Color',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 9,
+                          backgroundColor:
+                              AppTheme.accents[widget.themeController.accentIndex],
+                        ),
+                        SettingsRow.chevron(context),
+                      ],
+                    ),
+                    onTap: () => _push(
+                      ThemeScreen(controller: widget.themeController),
+                    ),
+                  ),
+                ],
+              ),
+              SettingsGroup(
+                title: 'General',
+                children: [
+                  SettingsRow(
+                    icon: Icons.privacy_tip_outlined,
+                    title: 'Privacy & Security',
+                    trailing: SettingsRow.chevron(context),
+                    onTap: () => _push(
+                      PrivacyScreen(
+                        lockController: lock,
+                        settings: widget.settings,
+                        repository: widget.repository,
+                        onDataChanged: widget.onDataChanged,
+                      ),
+                    ),
+                  ),
+                  SettingsRow(
+                    icon: Icons.import_export,
+                    title: 'Export / Import',
+                    trailing: SettingsRow.chevron(context),
+                    onTap: () => _push(
+                      ExportImportScreen(
+                        repository: widget.repository,
+                        onDataChanged: widget.onDataChanged,
+                      ),
+                    ),
+                  ),
+                  SettingsRow(
+                    icon: Icons.content_copy_outlined,
+                    title: 'Copy to Clipboard (30s)',
+                    subtitle: 'Clear the clipboard after copying a code',
+                    trailing: Switch(
+                      value: widget.settings.clipboardClear,
+                      onChanged: widget.settings.setClipboardClear,
+                    ),
+                  ),
+                  SettingsRow(
+                    icon: Icons.info_outline,
+                    title: 'About',
+                    trailing: SettingsRow.chevron(context),
+                    onTap: () => _push(const AboutScreen()),
+                  ),
+                ],
+              ),
             ],
           );
         },
       ),
-    );
-  }
-}
-
-class _PasswordDialog extends StatefulWidget {
-  final String title;
-  final String message;
-  final String action;
-  final bool confirm;
-
-  const _PasswordDialog({
-    required this.title,
-    required this.message,
-    required this.action,
-    required this.confirm,
-  });
-
-  @override
-  State<_PasswordDialog> createState() => _PasswordDialogState();
-}
-
-class _PasswordDialogState extends State<_PasswordDialog> {
-  final _password = TextEditingController();
-  final _confirm = TextEditingController();
-  String? _error;
-
-  @override
-  void dispose() {
-    _password.dispose();
-    _confirm.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final pw = _password.text;
-    if (widget.confirm) {
-      if (pw.length < BackupService.minPasswordLength) {
-        setState(() => _error =
-            'Use at least ${BackupService.minPasswordLength} characters.');
-        return;
-      }
-      if (pw != _confirm.text) {
-        setState(() => _error = 'Passwords do not match.');
-        return;
-      }
-    } else if (pw.isEmpty) {
-      setState(() => _error = 'Password is required.');
-      return;
-    }
-    Navigator.pop(context, pw);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.message),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _password,
-              obscureText: true,
-              autofocus: true,
-              decoration: AppTheme.inputDecoration(
-                context,
-                label: 'Backup password',
-                icon: Icons.lock_rounded,
-              ),
-            ),
-            if (widget.confirm) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _confirm,
-                obscureText: true,
-                decoration: AppTheme.inputDecoration(
-                  context,
-                  label: 'Confirm password',
-                  icon: Icons.lock_rounded,
-                ),
-              ),
-            ],
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(_error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(onPressed: _submit, child: Text(widget.action)),
-      ],
     );
   }
 }
