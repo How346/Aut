@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/animated_code.dart';
 import '../../../../core/widgets/countdown_ring.dart';
 import '../../../../core/widgets/service_icon.dart';
 import '../../domain/models/totp_account.dart';
@@ -13,11 +14,17 @@ class AccountCard extends StatelessWidget {
     required this.account,
     required this.onTap,
     required this.onLongPress,
+    this.masked = false,
+    this.showEye = false,
+    this.onToggleReveal,
   });
 
   final TotpAccount account;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final bool masked;
+  final bool showEye;
+  final VoidCallback? onToggleReveal;
 
   @override
   Widget build(BuildContext context) {
@@ -67,17 +74,41 @@ class AccountCard extends StatelessWidget {
                         ),
                       ),
                     const SizedBox(height: 4),
-                    Text(
-                      code == null ? 'Invalid key' : CodeClipboard.group(code),
-                      style: TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.5,
-                        color: code == null
-                            ? scheme.error
-                            : (urgent ? scheme.error : scheme.primary),
+                    if (code == null)
+                      Text(
+                        'Invalid key',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.error,
+                        ),
+                      )
+                    else
+                      Row(
+                        children: [
+                          AnimatedCode(
+                            code: CodeClipboard.group(code),
+                            fontSize: 21,
+                            masked: masked,
+                            color: urgent ? scheme.error : scheme.primary,
+                          ),
+                          if (showEye)
+                            InkResponse(
+                              onTap: onToggleReveal,
+                              radius: 20,
+                              child: Padding(
+                                padding: const EdgeInsets.all(6),
+                                child: Icon(
+                                  masked
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  size: 18,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
                   ],
                 ),
               ),

@@ -93,6 +93,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => LockActions.changePin(context, lock),
                   ),
                   SettingsRow(
+                    icon: Icons.visibility_off_outlined,
+                    title: 'Mask 2FA Codes',
+                    subtitle: 'Show ••• ••• until you tap the eye',
+                    trailing: Switch(
+                      value: widget.settings.maskCodes,
+                      onChanged: widget.settings.setMaskCodes,
+                    ),
+                  ),
+                  SettingsRow(
                     icon: Icons.fingerprint,
                     title: 'Biometric Authentication',
                     enabled: lock.enabled && _biometricsSupported,

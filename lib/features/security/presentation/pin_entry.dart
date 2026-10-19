@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -33,14 +35,29 @@ class PinEntry extends StatefulWidget {
   State<PinEntry> createState() => _PinEntryState();
 }
 
-class _PinEntryState extends State<PinEntry> {
+class _PinEntryState extends State<PinEntry>
+    with SingleTickerProviderStateMixin {
   String _pin = '';
+  late final AnimationController _shake = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  );
+
+  @override
+  void dispose() {
+    _shake.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant PinEntry oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.resetToken != widget.resetToken) {
       _pin = '';
+      if (widget.error != null && widget.error!.isNotEmpty) {
+        HapticFeedback.heavyImpact();
+        _shake.forward(from: 0);
+      }
     }
   }
 
@@ -168,11 +185,20 @@ class _PinEntryState extends State<PinEntry> {
               ),
             ),
             const SizedBox(height: 22),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 0; i < AppLockController.pinLength; i++) _dot(i),
-              ],
+            AnimatedBuilder(
+              animation: _shake,
+              builder: (context, child) {
+                final dx = math.sin(_shake.value * math.pi * 6) *
+                    12 *
+                    (1 - _shake.value);
+                return Transform.translate(offset: Offset(dx, 0), child: child);
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < AppLockController.pinLength; i++) _dot(i),
+                ],
+              ),
             ),
             SizedBox(
               height: 40,

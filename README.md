@@ -18,6 +18,8 @@ Authly is an offline-first, privacy-focused, zero-telemetry two-factor authentic
 - App lock with 4-digit PIN (PBKDF2-hashed, Android Keystore storage), biometric unlock, auto-lock timeout, hide-PIN option and attempt lockout.
 - Light / dark / system theme with 5 accent colours.
 - Encrypted `.authly` export / import (file, share sheet, clipboard) and "Clear all accounts".
+- **Mask 2FA codes** (Settings or the eye in the home header): codes show as bullets until you tap the eye on a card (auto-hides after 10 s).
+- Codes animate digit by digit when they refresh; the countdown ring sweeps smoothly and pulses in the last 5 seconds.
 - Clipboard auto-clear after 30 s; screenshots blocked (`FLAG_SECURE`); no network permission.
 
 ## Automated Builds with GitHub Actions

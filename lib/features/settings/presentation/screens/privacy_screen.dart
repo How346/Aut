@@ -44,6 +44,15 @@ class PrivacyScreen extends StatelessWidget {
                     ),
                   ),
                   SettingsRow(
+                    icon: Icons.blur_on,
+                    title: 'Mask 2FA Codes',
+                    subtitle: 'Show ••• ••• until you tap the eye',
+                    trailing: Switch(
+                      value: settings.maskCodes,
+                      onChanged: settings.setMaskCodes,
+                    ),
+                  ),
+                  SettingsRow(
                     icon: Icons.visibility_off_outlined,
                     title: 'Hide PIN',
                     subtitle: 'Hide the PIN while entering',

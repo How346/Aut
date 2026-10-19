@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../core/widgets/confirm_dialogs.dart';
+import '../../core/widgets/fade_slide_in.dart';
 import '../../core/widgets/service_icon.dart';
 import '../authenticator/data/repositories/secure_account_repository.dart';
 import '../authenticator/domain/models/totp_account.dart';
@@ -40,10 +41,12 @@ class _HomeShellState extends State<HomeShell> {
   bool _loading = true;
   String _query = '';
   Timer? _ticker;
+  final Map<String, DateTime> _revealUntil = {};
 
   @override
   void initState() {
     super.initState();
+    widget.settings.addListener(_onSettingsChanged);
     _load();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && _tab != 2 && _accounts.isNotEmpty) setState(() {});
@@ -52,8 +55,44 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    widget.settings.removeListener(_onSettingsChanged);
     _ticker?.cancel();
     super.dispose();
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  bool _isMasked(String id) {
+    if (!widget.settings.maskCodes) return false;
+    final until = _revealUntil[id];
+    return until == null || DateTime.now().isAfter(until);
+  }
+
+  void _toggleReveal(String id) {
+    setState(() {
+      if (_isMasked(id)) {
+        _revealUntil[id] = DateTime.now().add(const Duration(seconds: 10));
+      } else {
+        _revealUntil.remove(id);
+      }
+    });
+  }
+
+  Future<void> _toggleMask() async {
+    final next = !widget.settings.maskCodes;
+    _revealUntil.clear();
+    await widget.settings.setMaskCodes(next);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(next ? 'Codes masked' : 'Codes visible'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
   }
 
   Future<void> _load() async {
@@ -138,6 +177,10 @@ class _HomeShellState extends State<HomeShell> {
         onCopy: (a) => CodeClipboard.copy(context, a, widget.settings),
         onAdd: _openAdd,
         onSettings: () => setState(() => _tab = 2),
+        maskEnabled: widget.settings.maskCodes,
+        isMasked: _isMasked,
+        onToggleReveal: _toggleReveal,
+        onToggleMask: _toggleMask,
       ),
       _AccountsTab(
         loading: _loading,
@@ -301,7 +344,16 @@ class _HomeTab extends StatelessWidget {
     required this.onCopy,
     required this.onAdd,
     required this.onSettings,
+    required this.maskEnabled,
+    required this.isMasked,
+    required this.onToggleReveal,
+    required this.onToggleMask,
   });
+
+  final bool maskEnabled;
+  final bool Function(String id) isMasked;
+  final ValueChanged<String> onToggleReveal;
+  final VoidCallback onToggleMask;
 
   final bool loading;
   final List<TotpAccount> allAccounts;
@@ -336,10 +388,17 @@ class _HomeTab extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, i) {
           final account = accounts[i];
-          return AccountCard(
-            account: account,
-            onTap: () => onOpen(account),
-            onLongPress: () => onCopy(account),
+          return FadeSlideIn(
+            key: ValueKey(account.id),
+            index: i,
+            child: AccountCard(
+              account: account,
+              masked: isMasked(account.id),
+              showEye: maskEnabled,
+              onToggleReveal: () => onToggleReveal(account.id),
+              onTap: () => onOpen(account),
+              onLongPress: () => onCopy(account),
+            ),
           );
         },
       );
@@ -368,6 +427,16 @@ class _HomeTab extends StatelessWidget {
                     'Authly',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                   ),
+                ),
+                IconButton(
+                  tooltip: maskEnabled ? 'Unmask codes' : 'Mask codes',
+                  icon: Icon(
+                    maskEnabled
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: maskEnabled ? scheme.primary : null,
+                  ),
+                  onPressed: onToggleMask,
                 ),
                 IconButton(
                   tooltip: 'Settings',

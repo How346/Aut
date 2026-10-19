@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/settings/app_settings.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/animated_code.dart';
 import '../../../../core/widgets/confirm_dialogs.dart';
 import '../../../../core/widgets/countdown_ring.dart';
 import '../../../../core/widgets/service_icon.dart';
@@ -32,6 +33,27 @@ class AccountDetailsScreen extends StatefulWidget {
 class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   TotpAccount? _account;
   Timer? _ticker;
+  DateTime? _revealUntil;
+
+  bool get _masked {
+    if (!widget.settings.maskCodes) return false;
+    final until = _revealUntil;
+    return until == null || DateTime.now().isAfter(until);
+  }
+
+  void _toggleReveal() {
+    setState(() {
+      _revealUntil =
+          _masked ? DateTime.now().add(const Duration(seconds: 10)) : null;
+    });
+  }
+
+  Future<void> _toggleMask() async {
+    _revealUntil = null;
+    await widget.settings.setMaskCodes(!widget.settings.maskCodes);
+    if (!mounted) return;
+    setState(() {});
+  }
 
   @override
   void initState() {
@@ -236,21 +258,36 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                                 Flexible(
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      code == null
-                                          ? 'Invalid key'
-                                          : CodeClipboard.group(code),
-                                      style: TextStyle(
-                                        fontSize: 42,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 2,
-                                        color: code == null || urgent
-                                            ? scheme.error
-                                            : scheme.primary,
-                                      ),
-                                    ),
+                                    child: code == null
+                                        ? Text(
+                                            'Invalid key',
+                                            style: TextStyle(
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.w800,
+                                              color: scheme.error,
+                                            ),
+                                          )
+                                        : AnimatedCode(
+                                            code: CodeClipboard.group(code),
+                                            fontSize: 42,
+                                            masked: _masked,
+                                            color: urgent
+                                                ? scheme.error
+                                                : scheme.primary,
+                                          ),
                                   ),
                                 ),
+                                if (widget.settings.maskCodes)
+                                  IconButton(
+                                    tooltip: _masked ? 'Reveal code' : 'Hide code',
+                                    onPressed: _toggleReveal,
+                                    icon: Icon(
+                                      _masked
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      color: scheme.primary,
+                                    ),
+                                  ),
                                 const SizedBox(width: 12),
                                 CountdownRing(
                                   progress: info.progress,
@@ -262,16 +299,34 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                               ],
                             ),
                             const SizedBox(height: 18),
-                            OutlinedButton.icon(
-                              onPressed: code == null
-                                  ? null
-                                  : () => CodeClipboard.copy(
-                                        context,
-                                        account,
-                                        widget.settings,
-                                      ),
-                              icon: const Icon(Icons.copy_outlined, size: 18),
-                              label: const Text('Copy'),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: code == null
+                                      ? null
+                                      : () => CodeClipboard.copy(
+                                            context,
+                                            account,
+                                            widget.settings,
+                                          ),
+                                  icon: const Icon(Icons.copy_outlined, size: 18),
+                                  label: const Text('Copy'),
+                                ),
+                                const SizedBox(width: 10),
+                                TextButton.icon(
+                                  onPressed: _toggleMask,
+                                  icon: Icon(
+                                    widget.settings.maskCodes
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    widget.settings.maskCodes ? 'Unmask' : 'Mask',
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
