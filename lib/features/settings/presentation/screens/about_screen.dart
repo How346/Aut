@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/shield_lock_logo.dart';
 import '../widgets/settings_widgets.dart';
 
 class AboutScreen extends StatelessWidget {
@@ -15,16 +16,10 @@ class AboutScreen extends StatelessWidget {
         children: [
           const SizedBox(height: 16),
           Center(
-            child: SizedBox(
-              width: 86,
-              height: 92,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(Icons.shield_rounded, size: 92, color: scheme.secondary),
-                  const Icon(Icons.lock_rounded, size: 36, color: Colors.white),
-                ],
-              ),
+            child: ShieldLockLogo(
+              size: 84,
+              shieldColor: scheme.secondary,
+              filled: true,
             ),
           ),
           const SizedBox(height: 12),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/shield_lock_logo.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key, required this.nextBuilder});
@@ -50,20 +51,7 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             children: [
               const Spacer(flex: 3),
-              const SizedBox(
-                width: 130,
-                height: 140,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(Icons.shield_outlined, color: Colors.white, size: 140),
-                    Padding(
-                      padding: EdgeInsets.only(bottom: 6),
-                      child: Icon(Icons.lock_rounded, color: Colors.white, size: 54),
-                    ),
-                  ],
-                ),
-              ),
+              const ShieldLockLogo(size: 124, shieldColor: Colors.white),
               const SizedBox(height: 18),
               const Text(
                 'Authly',

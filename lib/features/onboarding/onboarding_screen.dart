@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/service_icon.dart';
+import '../../core/widgets/shield_lock_logo.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key, required this.onFinish});
@@ -147,12 +148,10 @@ class _Illustration extends StatelessWidget {
     Widget phoneContent;
     switch (page) {
       case 0:
-        phoneContent = Stack(
-          alignment: Alignment.center,
-          children: [
-            Icon(Icons.shield_rounded, size: 84, color: scheme.primary),
-            const Icon(Icons.lock_rounded, size: 32, color: Colors.white),
-          ],
+        phoneContent = ShieldLockLogo(
+          size: 76,
+          shieldColor: scheme.primary,
+          filled: true,
         );
       case 1:
         phoneContent = Icon(Icons.qr_code_2_rounded, size: 96, color: scheme.primary);

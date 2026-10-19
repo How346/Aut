@@ -6,6 +6,7 @@ import '../../core/settings/app_settings.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../core/widgets/confirm_dialogs.dart';
 import '../../core/widgets/fade_slide_in.dart';
+import '../../core/widgets/shield_lock_logo.dart';
 import '../../core/widgets/service_icon.dart';
 import '../authenticator/data/repositories/secure_account_repository.dart';
 import '../authenticator/domain/models/totp_account.dart';
@@ -298,12 +299,12 @@ class _EmptyState extends StatelessWidget {
                 color: scheme.primaryContainer,
                 shape: BoxShape.circle,
               ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(Icons.shield_rounded, size: 64, color: scheme.primary),
-                  const Icon(Icons.lock_rounded, size: 26, color: Colors.white),
-                ],
+              child: Center(
+                child: ShieldLockLogo(
+                  size: 62,
+                  shieldColor: scheme.primary,
+                  filled: true,
+                ),
               ),
             ),
             const SizedBox(height: 22),
