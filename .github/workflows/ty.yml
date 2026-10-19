@@ -12,71 +12,112 @@ permissions:
 
 jobs:
   build:
+    name: Build, Obfuscate and Encrypt Authly
     runs-on: ubuntu-latest
 
     steps:
+      # --------------------------------------------------
+      # 1. Checkout source
+      # --------------------------------------------------
       - name: Checkout source
         uses: actions/checkout@v4
 
+      # --------------------------------------------------
+      # 2. Configure Node.js
+      # --------------------------------------------------
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
+      # --------------------------------------------------
+      # 3. Install dependencies in the workspace
+      # --------------------------------------------------
       - name: Install build tools
         run: |
-          npm install --no-save --no-package-lock \
+          npm init -y
+          npm install --save-exact \
             javascript-obfuscator \
             cheerio \
             html-minifier-terser
 
+      # --------------------------------------------------
+      # 4. Validate source and password
+      # --------------------------------------------------
       - name: Validate input
-        shell: bash
-        run: |
-          test -s index.html || {
-            echo "ERROR: index.html is missing or empty."
-            exit 1
-          }
-
-          if [ -z "${SOURCE_BACKUP_PASSWORD:-}" ]; then
-            echo "ERROR: SOURCE_BACKUP_PASSWORD secret is missing."
-            exit 1
-          fi
         env:
           SOURCE_BACKUP_PASSWORD: ${{ secrets.SOURCE_BACKUP_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Create source copy
+          if [ ! -s index.html ]; then
+            echo "::error::index.html is missing or empty."
+            exit 1
+          fi
+
+          if [ -z "${SOURCE_BACKUP_PASSWORD:-}" ]; then
+            echo "::error::SOURCE_BACKUP_PASSWORD secret is missing."
+            exit 1
+          fi
+
+          if [ "${#SOURCE_BACKUP_PASSWORD}" -lt 8 ]; then
+            echo "::error::Backup password must contain at least 8 characters."
+            exit 1
+          fi
+
+          echo "Source and password checks passed."
+
+      # --------------------------------------------------
+      # 5. Create output directory and source copy
+      # --------------------------------------------------
+      - name: Prepare output
         run: |
           mkdir -p dist
           cp index.html dist/source.html
 
-      - name: Obfuscate website HTML
+      # --------------------------------------------------
+      # 6. Obfuscate inline JavaScript and minify HTML/CSS
+      # --------------------------------------------------
+      - name: Build obfuscated website
         shell: bash
         run: |
-          cat > /tmp/build.mjs <<'NODE'
+          set -euo pipefail
+
+          cat > build.mjs <<'NODE'
           import fs from "node:fs";
           import * as cheerio from "cheerio";
           import JavaScriptObfuscator from "javascript-obfuscator";
           import { minify } from "html-minifier-terser";
 
           const input = fs.readFileSync("index.html", "utf8");
+
           const $ = cheerio.load(input, {
             decodeEntities: false
           });
 
-          let count = 0;
+          let obfuscatedCount = 0;
 
           $("script").each((_, element) => {
             const script = $(element);
             const src = script.attr("src");
-            const type = (script.attr("type") || "").toLowerCase();
+            const type = (script.attr("type") || "")
+              .trim()
+              .toLowerCase();
 
-            // Preserve external scripts and JSON/data scripts.
-            if (src || (type && type !== "text/javascript"
-                && type !== "application/javascript"
-                && type !== "module")) {
-              return;
-            }
+            // Leave external scripts unchanged.
+            if (src) return;
+
+            // Preserve JSON, import maps, templates and other
+            // non-JavaScript script blocks.
+            const supportedTypes = [
+              "",
+              "text/javascript",
+              "application/javascript",
+              "module"
+            ];
+
+            if (!supportedTypes.includes(type)) return;
 
             const original = script.html();
 
@@ -99,40 +140,59 @@ jobs:
               );
 
               script.text(result.getObfuscatedCode());
-              count++;
+              obfuscatedCount++;
             } catch (error) {
-              console.error("Could not obfuscate inline script:", error.message);
+              console.error(
+                "JavaScript obfuscation failed:",
+                error.message
+              );
+
               process.exitCode = 1;
             }
           });
 
-          if (process.exitCode) process.exit(1);
+          if (process.exitCode) {
+            process.exit(1);
+          }
 
-          const html = $.html();
+          const processedHtml = $.html();
 
-          const output = await minify(html, {
+          const output = await minify(processedHtml, {
             collapseWhitespace: true,
             removeComments: true,
             removeRedundantAttributes: true,
             removeScriptTypeAttributes: false,
-            removeStyleLinkTypeAttributes: true,
+            removeStyleLinkTypeAttributes: false,
             minifyCSS: true,
             minifyJS: false
           });
 
-          fs.writeFileSync("dist/website.html", output);
+          fs.writeFileSync(
+            "dist/website.html",
+            output,
+            "utf8"
+          );
 
-          console.log(`Obfuscated ${count} inline JavaScript block(s).`);
-          console.log("Website generated: dist/website.html");
+          console.log(
+            `Obfuscated ${obfuscatedCount} inline JavaScript block(s).`
+          );
+
+          console.log("Created dist/website.html");
           NODE
 
-          node /tmp/build.mjs
+          node build.mjs
 
+      # --------------------------------------------------
+      # 7. Encrypt original source using AES-256-GCM
+      # --------------------------------------------------
       - name: Encrypt original source
         env:
           SOURCE_BACKUP_PASSWORD: ${{ secrets.SOURCE_BACKUP_PASSWORD }}
+        shell: bash
         run: |
-          cat > /tmp/encrypt.mjs <<'NODE'
+          set -euo pipefail
+
+          cat > encrypt.mjs <<'NODE'
           import fs from "node:fs";
           import crypto from "node:crypto";
 
@@ -146,9 +206,11 @@ jobs:
 
           const input = fs.readFileSync("index.html");
 
+          // Random salt and AES-GCM nonce.
           const salt = crypto.randomBytes(16);
           const iv = crypto.randomBytes(12);
 
+          // Derive a 256-bit key from the password.
           const key = crypto.pbkdf2Sync(
             password,
             salt,
@@ -168,40 +230,58 @@ jobs:
             cipher.final()
           ]);
 
-          const tag = cipher.getAuthTag();
+          const authenticationTag = cipher.getAuthTag();
 
-          // Format: magic (8) + salt (16) + IV (12)
-          //         + authentication tag (16) + ciphertext
-          const magic = Buffer.from("AUTHLY01");
+          // Binary format:
+          // 8 bytes  : magic/version marker
+          // 16 bytes : salt
+          // 12 bytes : IV
+          // 16 bytes : GCM authentication tag
+          // remaining: ciphertext
+          const header = Buffer.from("AUTHLY01", "ascii");
 
-          const encrypted = Buffer.concat([
-            magic,
+          const encryptedFile = Buffer.concat([
+            header,
             salt,
             iv,
-            tag,
+            authenticationTag,
             ciphertext
           ]);
 
           fs.writeFileSync(
             "dist/authly-source.enc",
-            encrypted
+            encryptedFile
           );
 
-          console.log("Encrypted source backup created.");
+          // Clear key bytes from this buffer when possible.
+          key.fill(0);
+
+          console.log(
+            "Created dist/authly-source.enc"
+          );
           NODE
 
-          node /tmp/encrypt.mjs
+          node encrypt.mjs
 
+      # --------------------------------------------------
+      # 8. Verify output files
+      # --------------------------------------------------
       - name: Verify generated files
+        shell: bash
         run: |
+          set -euo pipefail
+
           test -s dist/source.html
           test -s dist/website.html
           test -s dist/authly-source.enc
 
-          echo "All three output files exist."
+          echo "All three output files were generated:"
           ls -lh dist/
 
-      - name: Upload all three files
+      # --------------------------------------------------
+      # 9. Upload downloadable artifact
+      # --------------------------------------------------
+      - name: Upload Authly build
         uses: actions/upload-artifact@v4
         with:
           name: Authly-Secure-Build
