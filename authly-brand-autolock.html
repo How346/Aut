@@ -1,0 +1,3231 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0B63F6" id="metaThemeColor" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Authly — Authenticator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- jsQR for Optical QR Code Decoding -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <!-- QRCode.js for Shareable OTP QR Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --accent: #0B63F6;
+      --accent-dark: #0045B8;
+      --accent-soft: rgba(11, 99, 246, 0.12);
+      --bg-main: #F4F7FC;
+      --bg-card: #FFFFFF;
+      --text-primary: #0F172A;
+      --text-secondary: #64748B;
+      --border-color: #E2E8F0;
+    }
+
+    [data-theme="dark"] {
+      --bg-main: #0B1120;
+      --bg-card: #1E293B;
+      --text-primary: #F8FAFC;
+      --text-secondary: #94A3B8;
+      --border-color: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #E2ECF9;
+      color: var(--text-primary);
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+    }
+
+    [data-theme="dark"] body {
+      background: #050811;
+    }
+
+    .app-shell {
+      width: 100%;
+      max-width: 412px;
+      height: 100dvh;
+      max-height: 860px;
+      background: var(--bg-main);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 70px -15px rgba(11, 43, 102, 0.28), 0 0 0 1px rgba(0,0,0,0.06);
+      transition: background-color 0.25s ease;
+    }
+
+    @media (min-width: 481px) {
+      .app-shell {
+        height: 92dvh;
+        border-radius: 42px;
+        box-shadow: 0 30px 70px -15px rgba(11, 43, 102, 0.3), 0 0 0 10px #FFFFFF;
+      }
+      [data-theme="dark"] .app-shell {
+        box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.8), 0 0 0 10px #1E293B;
+      }
+    }
+
+    .authly-mark svg { display:block; overflow:visible; }
+    .bg-accent { background-color: var(--accent) !important; }
+    .bg-accent-gradient {
+      background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%) !important;
+    }
+    .text-accent { color: var(--accent) !important; }
+    .border-accent { border-color: var(--accent) !important; }
+    .bg-accent-soft { background-color: var(--accent-soft) !important; }
+
+    .card-surface {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+    }
+
+    .text-main { color: var(--text-primary); }
+    .text-sub { color: var(--text-secondary); }
+    .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+    @keyframes otpFlipIn { 0% { opacity:.35; transform:translateY(7px) scale(.96); filter:blur(2px); } 55% { opacity:1; transform:translateY(-1px) scale(1.015); filter:blur(0); } 100% { transform:translateY(0) scale(1); } }
+    @keyframes otpMaskIn { 0% { opacity:.2; transform:scale(.92); letter-spacing:.18em; filter:blur(3px); } 100% { opacity:1; transform:scale(1); filter:blur(0); } }
+    .otp-code-animate { animation:otpFlipIn .38s cubic-bezier(.2,.8,.2,1); }
+    .otp-mask-animate { animation:otpMaskIn .28s ease-out; }
+    @media (prefers-reduced-motion: reduce) { .otp-code-animate,.otp-mask-animate { animation:none !important; } }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    .progress-ring__circle {
+      transition: stroke-dashoffset 0.25s linear, stroke 0.25s ease;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+
+    @keyframes scanLaser {
+      0% { top: 8%; opacity: 0.5; }
+      50% { top: 90%; opacity: 1; }
+      100% { top: 8%; opacity: 0.5; }
+    }
+    .scanner-laser {
+      position: absolute;
+      left: 6%;
+      right: 6%;
+      height: 2.5px;
+      background: var(--accent);
+      box-shadow: 0 0 14px 3px var(--accent);
+      animation: scanLaser 2.2s infinite ease-in-out;
+      pointer-events: none;
+    }
+
+    .screen-enter {
+      animation: screenFade 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes screenFade {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes shakeError {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-10px); }
+      40%, 80% { transform: translateX(10px); }
+    }
+    .shake-error {
+      animation: shakeError 0.4s ease-in-out;
+    }
+
+    /* Clean Non-Overlapping PIN Keypad Button */
+    .pin-btn {
+      width: 64px;
+      height: 64px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: #FFFFFF;
+      font-size: 1.35rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.12s ease, background-color 0.15s ease;
+      user-select: none;
+    }
+    .pin-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+    .pin-btn:active {
+      background: rgba(255, 255, 255, 0.36);
+      transform: scale(0.92);
+    }
+
+    .toggle-switch {
+      width: 46px;
+      height: 26px;
+      border-radius: 999px;
+      background: #CBD5E1;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.25s ease;
+      flex-shrink: 0;
+    }
+    [data-theme="dark"] .toggle-switch {
+      background: #475569;
+    }
+    .toggle-switch.active {
+      background: var(--accent);
+    }
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      transition: transform 0.25s ease;
+    }
+    .toggle-switch.active::after {
+      transform: translateX(20px);
+    }
+  </style>
+</head>
+<body class="select-none">
+
+  <!-- Main Native Mobile App Container -->
+  <div class="app-shell" id="appShell">
+    <!-- Status Bar -->
+    <div id="statusBar" class="w-full px-6 pt-3 pb-2 flex items-center justify-between text-xs font-semibold z-30 transition-colors shrink-0">
+      <span id="statusClock">9:41</span>
+      <div class="flex items-center gap-1.5">
+        <i data-lucide="signal" class="w-3.5 h-3.5"></i>
+        <i data-lucide="wifi" id="wifiStatusIcon" class="w-3.5 h-3.5"></i>
+        <div class="flex items-center gap-1" title="Battery Level">
+          <span id="batteryPct" class="text-[10px] opacity-80 hidden sm:inline"></span>
+          <div class="w-5 h-2.5 border border-current rounded-[3px] p-[1px] flex items-center">
+            <div id="batteryFill" class="h-full bg-current rounded-[1px] transition-all" style="width: 100%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live 30-Second Clipboard Protection Banner -->
+    <div id="clipboardBanner" class="hidden bg-emerald-600 text-white px-4 py-1.5 text-[11px] font-medium flex items-center justify-between z-30 shrink-0 shadow-sm">
+      <div class="flex items-center gap-1.5 truncate">
+        <i data-lucide="shield-check" class="w-3.5 h-3.5 shrink-0"></i>
+        <span id="clipboardBannerText" class="truncate">Code copied! Auto-clearing clipboard in 30s</span>
+      </div>
+      <button onclick="clearClipboardImmediately()" class="text-[10px] bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded font-semibold ml-2 shrink-0">
+        Clear Now
+      </button>
+    </div>
+
+    <!-- Dynamic Screen Viewport -->
+    <div id="screenViewport" class="flex-1 flex flex-col overflow-hidden relative"></div>
+
+    <!-- Modal for Sharing/Viewing Account QR Code -->
+    <div id="qrShareModal" style="display:none!important" class="hidden absolute inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-6">
+      <div class="card-surface rounded-3xl p-6 w-full max-w-xs flex flex-col items-center text-center shadow-2xl">
+        <h3 id="qrShareTitle" class="font-bold text-base text-main">Export Account QR</h3>
+        <p id="qrShareSub" class="text-xs text-sub mt-0.5 mb-4">Scan this QR with any authenticator app</p>
+        <div id="qrShareCanvasWrap" class="bg-white p-4 rounded-2xl shadow-inner border border-slate-100 flex items-center justify-center"></div>
+        <p id="qrShareSecretText" class="text-[11px] font-mono text-sub mt-3 break-all select-all px-2"></p>
+        <div class="w-full grid grid-cols-2 gap-2 mt-5">
+          <button onclick="downloadAccountQrImage()" class="py-2.5 rounded-xl border border-accent text-accent font-semibold text-xs flex items-center justify-center gap-1.5 hover:bg-accent-soft transition">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Save QR</span>
+          </button>
+          <button onclick="closeQrShareModal()" class="py-2.5 rounded-xl bg-accent text-white font-semibold text-xs">
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Toast Notification -->
+    <div id="toast" class="pointer-events-none opacity-0 transition-all duration-300 transform translate-y-4 absolute bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 whitespace-nowrap max-w-[90%]">
+      <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+      <span id="toastMsg" class="truncate">Copied to clipboard</span>
+    </div>
+  </div>
+
+  <!-- Password modal for encrypted backup export -->
+  <div id="backupPasswordModal" class="hidden absolute inset-0 z-[80] bg-slate-950/70 backdrop-blur-sm items-center justify-center p-5" role="dialog" aria-modal="true" aria-labelledby="backupModalTitle">
+    <form id="backupPasswordForm" class="card-surface w-full max-w-sm rounded-3xl p-5 shadow-2xl" autocomplete="off">
+      <div class="w-12 h-12 rounded-2xl bg-accent-soft text-accent flex items-center justify-center mb-4"><i data-lucide="shield-check" class="w-6 h-6"></i></div>
+      <h2 id="backupModalTitle" class="text-lg font-extrabold text-main">Protect your backup</h2>
+      <p class="text-xs text-sub mt-1 mb-4">Create a password to encrypt your Authly backup before downloading. Minimum 8 characters.</p>
+      <label for="backupPassword" class="block text-xs font-semibold text-main mb-1.5">Backup password</label>
+      <div class="relative"><input id="backupPassword" type="password" minlength="8" required autocomplete="new-password" class="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent text-main px-3 py-3 pr-12 text-base outline-none focus:border-blue-500" placeholder="At least 8 characters"><button id="toggleBackupPassword" type="button" class="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-sub" aria-label="Show password"><i data-lucide="eye" class="w-4 h-4"></i></button></div>
+      <label for="backupPasswordConfirm" class="block text-xs font-semibold text-main mt-3 mb-1.5">Confirm password</label>
+      <input id="backupPasswordConfirm" type="password" minlength="8" required autocomplete="new-password" class="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent text-main px-3 py-3 text-base outline-none focus:border-blue-500" placeholder="Enter password again">
+      <p id="backupPasswordError" class="hidden text-xs text-red-500 mt-2" aria-live="polite"></p>
+      <div class="grid grid-cols-2 gap-2 mt-5"><button id="cancelBackupPassword" type="button" class="rounded-xl py-3 font-semibold text-sm card-surface text-main">Cancel</button><button type="submit" class="rounded-xl py-3 font-semibold text-sm bg-accent text-white">Encrypt & Download</button></div>
+    </form>
+  </div>
+
+  <!-- Hidden File Inputs for Real JSON Backup Restore & QR Image Decoding -->
+  <input type="file" id="importJsonInput" accept=".authly,.json,application/octet-stream,application/json" class="hidden" onchange="handleJsonImport(event)" />
+  <input type="file" id="qrImageInput" accept="image/*" class="hidden" onchange="handleQrImageUpload(event)" />
+
+  <script>
+    /*************************************************************************
+     * 1. PERSISTENT STATE (CLEAN START, NO DEMO ACCOUNTS, NO BIOMETRICS)
+     *************************************************************************/
+    const STORAGE_KEY = 'authly_clean_production_v5';
+
+    const POPULAR_SERVICES = [
+      { name: 'Google', icon: 'google', placeholder: 'user@gmail.com' },
+      { name: 'Microsoft', icon: 'microsoft', placeholder: 'user@outlook.com' },
+      { name: 'GitHub', icon: 'github', placeholder: 'username' },
+      { name: 'Amazon', icon: 'amazon', placeholder: 'user@amazon.com' },
+      { name: 'Discord', icon: 'discord', placeholder: 'username#0001' }
+    ];
+
+    const ACCENT_COLORS = [
+      { name: 'Blue', hex: '#0B63F6', dark: '#0045B8', soft: 'rgba(11, 99, 246, 0.12)' },
+      { name: 'Purple', hex: '#7C3AED', dark: '#5B21B6', soft: 'rgba(124, 58, 237, 0.12)' },
+      { name: 'Emerald', hex: '#10B981', dark: '#047857', soft: 'rgba(16, 185, 129, 0.12)' },
+      { name: 'Orange', hex: '#F97316', dark: '#C2410C', soft: 'rgba(249, 115, 22, 0.12)' },
+      { name: 'Rose', hex: '#F43F5E', dark: '#BE123C', soft: 'rgba(244, 63, 94, 0.12)' }
+    ];
+
+    // Soft Faded Blue & Cool Pastel Palettes for Letter Avatars
+    const LETTER_AVATAR_STYLES = [
+      { bg: 'linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%)', text: '#1D4ED8', border: '#93C5FD' },
+      { bg: 'linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%)', text: '#0369A1', border: '#7DD3FC' },
+      { bg: 'linear-gradient(135deg, #E0E7FF 0%, #C7D2FE 100%)', text: '#4338CA', border: '#A5B4FC' },
+      { bg: 'linear-gradient(135deg, #CCFBF1 0%, #99F6E4 100%)', text: '#0F766E', border: '#5EEAD4' },
+      { bg: 'linear-gradient(135deg, #ECFEFF 0%, #A5F3FC 100%)', text: '#0E7490', border: '#67E8F9' },
+      { bg: 'linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%)', text: '#6D28D9', border: '#C4B5FD' }
+    ];
+
+    let state = {
+      currentScreen: 'splash',
+      previousScreen: 'home',
+      selectedAccountId: null,
+      searchQuery: '',
+      prefillService: null,
+      pinBuffer: '',
+      tempNewPin: '',
+      pinMode: 'unlock', // 'unlock' | 'setup-new' | 'verify-old' | 'set-new' | 'confirm-new'
+      pinError: false,
+      isAuthenticated: false,
+      revealedAccountIds: {},
+      lastActivityAt: Date.now(),
+      accounts: [],
+      settings: {
+        hasCompletedOnboarding: false,
+        appLock: false,
+        pin: '',
+        hidePin: true,
+        maskCodes: false,
+        theme: 'light',
+        systemDefaultTheme: false,
+        accentColor: '#0B63F6',
+        notifications: true,
+        clipboardClear30s: true,
+        autoLock5m: true,
+        autoLockMinutes: 5
+      }
+    };
+
+    let totpCache = {};
+    let cameraStream = null;
+    let qrRafId = null;
+    let currentFacingMode = 'environment';
+    let torchEnabled = false;
+    let cameraPermissionGranted = false;
+    let currentQrModalAccount = null;
+
+    // 30-second Clipboard Countdown State
+    let clipboardCountdownSeconds = 0;
+    let clipboardIntervalId = null;
+    let lastCopiedAccountId = null;
+    let clipboardClearDeadline = 0;
+    let lastCopiedClipboardText = '';
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed.accounts)) state.accounts = parsed.accounts;
+          if (parsed.settings) state.settings = { ...state.settings, ...parsed.settings };
+        }
+      } catch (err) {
+        console.error('State load error:', err);
+      }
+      applyThemeAndAccent();
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          accounts: state.accounts,
+          settings: state.settings
+        }));
+      } catch (err) {
+        console.error('State save error:', err);
+      }
+    }
+
+    function applyThemeAndAccent() {
+      const html = document.documentElement;
+      let mode = state.settings.theme;
+      if (state.settings.systemDefaultTheme) {
+        mode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      html.setAttribute('data-theme', mode);
+
+      const accent = ACCENT_COLORS.find(c => c.hex === state.settings.accentColor) || ACCENT_COLORS[0];
+      html.style.setProperty('--accent', accent.hex);
+      html.style.setProperty('--accent-dark', accent.dark);
+      html.style.setProperty('--accent-soft', accent.soft);
+
+      const metaTheme = document.getElementById('metaThemeColor');
+      if (metaTheme) metaTheme.setAttribute('content', accent.hex);
+    }
+
+    /*************************************************************************
+     * 2. UNIVERSAL CLIPBOARD ENGINE + 30-SECOND AUTO-CLEAR COUNTDOWN
+     *************************************************************************/
+    async function writeTextToSystemClipboard(text) {
+      // Method 1: Modern Async Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (err) {
+          // Fall through to synchronous textarea fallback
+        }
+      }
+
+      // Method 2: Universal synchronous fallback (works on file://, HTTP, mobile webviews)
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.setAttribute('readonly', '');
+        textArea.style.position = 'fixed';
+        textArea.style.top = '-9999px';
+        textArea.style.left = '-9999px';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+
+        textArea.focus();
+        textArea.select();
+        textArea.setSelectionRange(0, text.length);
+
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        return successful;
+      } catch (err) {
+        return false;
+      }
+    }
+
+    async function copyTotpCode(accountId) {
+      const entry = totpCache[accountId];
+      if (!entry) return;
+      const rawDigits = entry.code.replace(/\s+/g, '');
+      lastCopiedClipboardText = rawDigits;
+
+      const copiedOk = await writeTextToSystemClipboard(rawDigits);
+      if (navigator.vibrate) navigator.vibrate(40);
+
+      lastCopiedAccountId = accountId;
+
+      if (copiedOk) {
+        showToast(`Copied ${rawDigits} to clipboard`);
+      } else {
+        showToast(`Copy blocked by browser. Code: ${rawDigits}`);
+      }
+
+      // Update copy button feedback if on Account Details
+      const copyBtnLabel = document.getElementById('detailsCopyBtnLabel');
+      if (copyBtnLabel) {
+        copyBtnLabel.textContent = 'Copied!';
+        setTimeout(() => {
+          const el = document.getElementById('detailsCopyBtnLabel');
+          if (el) el.textContent = 'Copy';
+        }, 1800);
+      }
+
+      // Start 30-second Clipboard Protection Countdown if enabled
+      if (state.settings.clipboardClear30s && copiedOk) {
+        startClipboardAutoClearCountdown(30);
+      } else if (!copiedOk) {
+        lastCopiedClipboardText = '';
+      }
+    }
+
+    function startClipboardAutoClearCountdown(seconds = 30) {
+      clearInterval(clipboardIntervalId);
+      clearTimeout(window.authlyClipboardTimeout);
+      clipboardCountdownSeconds = seconds;
+      clipboardClearDeadline = Date.now() + seconds * 1000;
+      const banner = document.getElementById('clipboardBanner');
+      const bannerText = document.getElementById('clipboardBannerText');
+      if (banner) banner.classList.remove('hidden');
+
+      const tick = () => {
+        clipboardCountdownSeconds = Math.max(0, Math.ceil((clipboardClearDeadline - Date.now()) / 1000));
+        const textEl = document.getElementById('clipboardBannerText');
+        if (clipboardCountdownSeconds <= 0) {
+          clearInterval(clipboardIntervalId);
+          clearClipboardImmediately();
+          return;
+        }
+        if (textEl) textEl.textContent = `Code copied! Auto-clearing clipboard in ${clipboardCountdownSeconds}s`;
+      };
+      if (bannerText) bannerText.textContent = `Code copied! Auto-clearing clipboard in ${seconds}s`;
+      clipboardIntervalId = setInterval(tick, 250);
+      window.authlyClipboardTimeout = setTimeout(tick, seconds * 1000 + 50);
+    }
+
+    async function clearClipboardImmediately() {
+      clearInterval(clipboardIntervalId);
+      clearTimeout(window.authlyClipboardTimeout);
+      clipboardCountdownSeconds = 0;
+      const banner = document.getElementById('clipboardBanner');
+      if (banner) banner.classList.add('hidden');
+
+      // Only clear if the clipboard still contains the OTP we copied; never erase
+      // a newer password/message the user copied in the meantime.
+      let cleared = false;
+      const expected = lastCopiedClipboardText || '';
+      for (let attempt = 0; attempt < 4 && !cleared; attempt++) {
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            let current = null;
+            try { current = await navigator.clipboard.readText(); } catch (_) {}
+            if (current !== null && current !== expected) {
+              showToast('Clipboard changed; left your newer copied text untouched');
+              lastCopiedClipboardText = '';
+              return;
+            }
+            await navigator.clipboard.writeText('');
+            cleared = true;
+          } else {
+            // Legacy WebView/browser fallback. This is best-effort and may be
+            // denied by Android when no fresh user gesture is available.
+            const ta = document.createElement('textarea');
+            ta.value = '';
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed'; ta.style.opacity = '0'; ta.style.left = '-9999px';
+            document.body.appendChild(ta); ta.focus(); ta.select();
+            cleared = document.execCommand('copy');
+            ta.remove();
+          }
+        } catch (_) {
+          cleared = false;
+        }
+        if (!cleared) await new Promise(resolve => setTimeout(resolve, 350));
+      }
+      lastCopiedClipboardText = '';
+      showToast(cleared ? 'Clipboard cleared' : 'Android/browser blocked auto-clear. Tap Clear Now or clear it from the clipboard panel');
+    }
+
+    // Keep countdown accurate after Android suspends the page in the background.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && clipboardClearDeadline && Date.now() >= clipboardClearDeadline) {
+        clearClipboardImmediately();
+      }
+    });
+
+    /*************************************************************************
+     * 3. REAL CRYPTOGRAPHIC RFC 6238 TOTP ENGINE & CODE MASKING
+     *************************************************************************/
+    function cleanBase32Input(str) {
+      return (str || '')
+        .toUpperCase()
+        .replace(/[\s=-]+/g, '')
+        .replace(/0/g, 'O')
+        .replace(/1/g, 'I')
+        .replace(/8/g, 'B');
+    }
+
+    function isValidBase32(str) {
+      const cleaned = cleanBase32Input(str);
+      return cleaned.length >= 8 && /^[A-Z2-7]+$/.test(cleaned);
+    }
+
+    function base32ToUint8Array(base32) {
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+      const cleaned = cleanBase32Input(base32).replace(/[^A-Z2-7]/g, '');
+      let bits = '';
+      for (let i = 0; i < cleaned.length; i++) {
+        const val = alphabet.indexOf(cleaned[i]);
+        if (val !== -1) bits += val.toString(2).padStart(5, '0');
+      }
+      const bytes = new Uint8Array(Math.floor(bits.length / 8));
+      for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+      }
+      return bytes;
+    }
+
+    function bytesToBase32(bytes) {
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+      let bits = '';
+      for (let i = 0; i < bytes.length; i++) {
+        bits += bytes[i].toString(2).padStart(8, '0');
+      }
+      let out = '';
+      for (let i = 0; i < bits.length; i += 5) {
+        const chunk = bits.slice(i, i + 5).padEnd(5, '0');
+        out += alphabet[parseInt(chunk, 2)];
+      }
+      return out;
+    }
+
+    async function computeTOTP(secret, period = 30, digits = 6, algorithm = 'SHA-1') {
+      try {
+        const keyBytes = base32ToUint8Array(secret);
+        if (!keyBytes.length) return '000 000';
+
+        const epochSeconds = Math.floor(Date.now() / 1000);
+        const counter = Math.floor(epochSeconds / period);
+
+        const counterBuffer = new ArrayBuffer(8);
+        const counterView = new DataView(counterBuffer);
+        counterView.setUint32(0, Math.floor(counter / 0x100000000), false);
+        counterView.setUint32(4, counter >>> 0, false);
+
+        const upperAlgo = String(algorithm || 'SHA-1').toUpperCase();
+        const normalizedAlgo = upperAlgo.includes('256')
+          ? 'SHA-256'
+          : upperAlgo.includes('512')
+          ? 'SHA-512'
+          : 'SHA-1';
+
+        const cryptoKey = await crypto.subtle.importKey(
+          'raw',
+          keyBytes,
+          { name: 'HMAC', hash: { name: normalizedAlgo } },
+          false,
+          ['sign']
+        );
+
+        const sig = await crypto.subtle.sign('HMAC', cryptoKey, counterBuffer);
+        const hmac = new Uint8Array(sig);
+        const offset = hmac[hmac.length - 1] & 0x0f;
+        const binary =
+          ((hmac[offset] & 0x7f) << 24) |
+          ((hmac[offset + 1] & 0xff) << 16) |
+          ((hmac[offset + 2] & 0xff) << 8) |
+          (hmac[offset + 3] & 0xff);
+
+        const rawOtp = (binary % Math.pow(10, digits)).toString().padStart(digits, '0');
+        return digits === 8
+          ? `${rawOtp.slice(0, 4)} ${rawOtp.slice(4)}`
+          : `${rawOtp.slice(0, 3)} ${rawOtp.slice(3)}`;
+      } catch (e) {
+        return '--- ---';
+      }
+    }
+
+    function getDisplayTotpCode(accountId) {
+      const entry = totpCache[accountId];
+      if (!entry) return '--- ---';
+      if (state.settings.maskCodes && !state.revealedAccountIds[accountId]) {
+        const is8 = entry.code.replace(/\s+/g, '').length === 8;
+        return is8 ? '•••• ••••' : '••• •••';
+      }
+      return entry.code;
+    }
+
+    function toggleRevealSingleAccount(accountId) {
+      state.revealedAccountIds[accountId] = !state.revealedAccountIds[accountId];
+      updateAllTotpCodes();
+      render();
+    }
+
+    function toggleGlobalMaskCodes() {
+      state.settings.maskCodes = !state.settings.maskCodes;
+      if (state.settings.maskCodes) {
+        state.revealedAccountIds = {};
+      }
+      saveState();
+      updateAllTotpCodes();
+      render();
+      showToast(state.settings.maskCodes ? 'Codes Masked (••• •••)' : 'Codes Visible');
+    }
+
+    async function updateAllTotpCodes() {
+      const nowSec = Math.floor(Date.now() / 1000);
+
+      for (const acc of state.accounts) {
+        const period = Number(acc.period) || 30;
+        const digits = Number(acc.digits) === 8 ? 8 : 6;
+        const algo = acc.algorithm || 'SHA-1';
+        const remaining = period - (nowSec % period);
+        const code = await computeTOTP(acc.secret, period, digits, algo);
+        totpCache[acc.id] = { code, remaining, period };
+      }
+
+      document.querySelectorAll('[data-totp-code]').forEach(el => {
+        const id = el.getAttribute('data-totp-code');
+        if (totpCache[id]) {
+          const nextText = getDisplayTotpCode(id);
+          const previousText = el.textContent;
+          if (nextText !== previousText) {
+            el.textContent = nextText;
+            el.classList.remove('otp-code-animate', 'otp-mask-animate');
+            void el.offsetWidth;
+            el.classList.add(nextText.includes('•') ? 'otp-mask-animate' : 'otp-code-animate');
+            window.setTimeout(() => el.classList.remove('otp-code-animate', 'otp-mask-animate'), 450);
+          }
+        }
+      });
+
+      document.querySelectorAll('[data-totp-timer]').forEach(el => {
+        const id = el.getAttribute('data-totp-timer');
+        const suffix = el.getAttribute('data-suffix') || '';
+        if (totpCache[id]) el.textContent = `${totpCache[id].remaining}${suffix}`;
+      });
+
+      document.querySelectorAll('[data-totp-ring]').forEach(circle => {
+        const id = circle.getAttribute('data-totp-ring');
+        if (!totpCache[id]) return;
+        const { remaining, period } = totpCache[id];
+        const r = parseFloat(circle.getAttribute('r'));
+        const c = 2 * Math.PI * r;
+        const offset = c - (remaining / period) * c;
+        circle.style.strokeDasharray = `${c} ${c}`;
+        circle.style.strokeDashoffset = offset;
+        circle.style.stroke = remaining <= 5 ? '#EF4444' : 'var(--accent)';
+      });
+    }
+
+    /*************************************************************************
+     * 4. MULTI-STAGE QR IMAGE & CAMERA PERMISSION SCANNER
+     *************************************************************************/
+    function parseGoogleAuthMigrationUri(uri) {
+      try {
+        const url = new URL(uri);
+        const dataParam = url.searchParams.get('data');
+        if (!dataParam) return [];
+
+        const b64 = dataParam.replace(/-/g, '+').replace(/_/g, '/');
+        const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+        const raw = atob(b64 + pad);
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+
+        const accounts = [];
+        let pos = 0;
+
+        function readVarint(buf, p) {
+          let res = 0, shift = 0;
+          while (p < buf.length) {
+            const b = buf[p++];
+            res |= (b & 0x7f) << shift;
+            if (!(b & 0x80)) break;
+            shift += 7;
+          }
+          return [res, p];
+        }
+
+        while (pos < bytes.length) {
+          const [tag, nextPos] = readVarint(bytes, pos);
+          pos = nextPos;
+          const fieldNum = tag >> 3;
+          const wireType = tag & 7;
+
+          if (fieldNum === 1 && wireType === 2) {
+            const [len, bodyStart] = readVarint(bytes, pos);
+            const sub = bytes.slice(bodyStart, bodyStart + len);
+            pos = bodyStart + len;
+
+            let sp = 0;
+            let secretBytes = null;
+            let name = '';
+            let issuer = '';
+            let algo = 'SHA-1';
+            let digits = 6;
+
+            while (sp < sub.length) {
+              const [stag, snext] = readVarint(sub, sp);
+              sp = snext;
+              const sfield = stag >> 3;
+              const swire = stag & 7;
+
+              if (swire === 2) {
+                const [slen, sbody] = readVarint(sub, sp);
+                const slice = sub.slice(sbody, sbody + slen);
+                sp = sbody + slen;
+                if (sfield === 1) secretBytes = slice;
+                else if (sfield === 2) name = new TextDecoder().decode(slice);
+                else if (sfield === 3) issuer = new TextDecoder().decode(slice);
+              } else if (swire === 0) {
+                const [sval, sbody] = readVarint(sub, sp);
+                sp = sbody;
+                if (sfield === 4) {
+                  algo = sval === 2 ? 'SHA-256' : sval === 3 ? 'SHA-512' : 'SHA-1';
+                } else if (sfield === 5) {
+                  digits = sval === 2 ? 8 : 6;
+                }
+              } else {
+                break;
+              }
+            }
+
+            if (secretBytes && secretBytes.length) {
+              const secretBase32 = bytesToBase32(secretBytes);
+              let finalIssuer = issuer;
+              let finalAccount = name;
+              if (name.includes(':')) {
+                const parts = name.split(':');
+                if (!finalIssuer) finalIssuer = parts[0].trim();
+                finalAccount = parts.slice(1).join(':').trim();
+              }
+              accounts.push({
+                issuer: finalIssuer || finalAccount || 'Authenticator',
+                account: finalAccount || 'user@account',
+                secret: secretBase32,
+                algorithm: algo,
+                digits,
+                period: 30
+              });
+            }
+          } else if (wireType === 0) {
+            const [, npos] = readVarint(bytes, pos);
+            pos = npos;
+          } else if (wireType === 2) {
+            const [len, npos] = readVarint(bytes, pos);
+            pos = npos + len;
+          } else {
+            break;
+          }
+        }
+        return accounts;
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function parseQrPayloadToAccounts(rawText) {
+      const trimmed = (rawText || '').trim();
+      if (!trimmed) return [];
+
+      if (trimmed.toLowerCase().startsWith('otpauth-migration://')) {
+        return parseGoogleAuthMigrationUri(trimmed);
+      }
+
+      if (trimmed.toLowerCase().startsWith('otpauth://')) {
+        try {
+          const safeUrlStr = trimmed.replace(/^otpauth:\/\//i, 'https://');
+          const url = new URL(safeUrlStr);
+          const rawPath = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+          const params = url.searchParams;
+
+          const rawSecret = params.get('secret') || '';
+          const cleanedSecret = cleanBase32Input(rawSecret);
+          if (!isValidBase32(cleanedSecret)) return [];
+
+          let issuer = (params.get('issuer') || '').trim();
+          let account = rawPath.trim();
+
+          if (account.includes(':')) {
+            const parts = account.split(':');
+            if (!issuer) issuer = parts[0].trim();
+            account = parts.slice(1).join(':').trim();
+          }
+          if (!issuer) issuer = account || 'Authenticator';
+          if (!account) account = 'user@account';
+
+          const rawAlgo = (params.get('algorithm') || 'SHA-1').toUpperCase();
+          const algorithm = rawAlgo.includes('256') ? 'SHA-256' : rawAlgo.includes('512') ? 'SHA-512' : 'SHA-1';
+          const digits = parseInt(params.get('digits') || '6', 10) === 8 ? 8 : 6;
+          const period = parseInt(params.get('period') || '30', 10) || 30;
+
+          return [{ issuer, account, secret: cleanedSecret, algorithm, digits, period }];
+        } catch (err) {}
+      }
+
+      const secretMatch = trimmed.match(/[?&]secret=([A-Za-z2-7\s=-]{8,})/i);
+      if (secretMatch && isValidBase32(secretMatch[1])) {
+        const issuerMatch = trimmed.match(/[?&]issuer=([^&]+)/i);
+        return [{
+          issuer: issuerMatch ? decodeURIComponent(issuerMatch[1]) : 'Scanned Service',
+          account: 'user@account',
+          secret: cleanBase32Input(secretMatch[1]),
+          algorithm: 'SHA-1',
+          digits: 6,
+          period: 30
+        }];
+      }
+
+      if (isValidBase32(trimmed)) {
+        return [{
+          issuer: 'Scanned Account',
+          account: 'user@authly',
+          secret: cleanBase32Input(trimmed),
+          algorithm: 'SHA-1',
+          digits: 6,
+          period: 30
+        }];
+      }
+
+      return [];
+    }
+
+    async function decodeQrFromImageElement(img) {
+      if ('BarcodeDetector' in window) {
+        try {
+          const detector = new BarcodeDetector({ formats: ['qr_code'] });
+          const barcodes = await detector.detect(img);
+          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+            return barcodes[0].rawValue;
+          }
+        } catch (e) {}
+      }
+
+      if (!window.jsQR) return null;
+
+      const natW = img.naturalWidth || img.width;
+      const natH = img.naturalHeight || img.height;
+      if (!natW || !natH) return null;
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+      const tryExtractFromCanvas = (w, h) => {
+        const imgData = ctx.getImageData(0, 0, w, h);
+        let res = jsQR(imgData.data, w, h, { inversionAttempts: 'attemptBoth' });
+        if (res && res.data) return res.data;
+
+        const data = imgData.data;
+        const binarized = new Uint8ClampedArray(data.length);
+        let totalLum = 0;
+        const pixelCount = w * h;
+        for (let i = 0; i < data.length; i += 4) {
+          totalLum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        }
+        const avgLum = totalLum / pixelCount;
+        const threshold = Math.max(80, Math.min(180, avgLum * 0.92));
+
+        for (let i = 0; i < data.length; i += 4) {
+          const alpha = data[i + 3];
+          const r = alpha < 128 ? 255 : data[i];
+          const g = alpha < 128 ? 255 : data[i + 1];
+          const b = alpha < 128 ? 255 : data[i + 2];
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          const v = lum < threshold ? 0 : 255;
+          binarized[i] = v;
+          binarized[i + 1] = v;
+          binarized[i + 2] = v;
+          binarized[i + 3] = 255;
+        }
+        res = jsQR(binarized, w, h, { inversionAttempts: 'attemptBoth' });
+        if (res && res.data) return res.data;
+
+        return null;
+      };
+
+      const targetMaxSizes = [1000, 600, 1400, 400, 1800];
+      const padRatios = [0.12, 0.0, 0.22];
+
+      for (const padRatio of padRatios) {
+        for (const maxDim of targetMaxSizes) {
+          const scale = Math.min(1, maxDim / Math.max(natW, natH));
+          const drawW = Math.max(120, Math.round(natW * scale));
+          const drawH = Math.max(120, Math.round(natH * scale));
+          const pad = Math.round(Math.max(drawW, drawH) * padRatio);
+          const totalW = drawW + pad * 2;
+          const totalH = drawH + pad * 2;
+
+          canvas.width = totalW;
+          canvas.height = totalH;
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, totalW, totalH);
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(img, pad, pad, drawW, drawH);
+
+          const found = tryExtractFromCanvas(totalW, totalH);
+          if (found) return found;
+        }
+      }
+
+      const cropRegions = [
+        { x: 0.1, y: 0.15, w: 0.8, h: 0.7 },
+        { x: 0.15, y: 0.2, w: 0.7, h: 0.6 },
+        { x: 0.05, y: 0.05, w: 0.9, h: 0.9 }
+      ];
+      for (const reg of cropRegions) {
+        const sx = Math.round(natW * reg.x);
+        const sy = Math.round(natH * reg.y);
+        const sw = Math.round(natW * reg.w);
+        const sh = Math.round(natH * reg.h);
+        if (sw < 80 || sh < 80) continue;
+
+        const outW = 800;
+        const outH = Math.round((sh / sw) * 800);
+        const pad = 60;
+        canvas.width = outW + pad * 2;
+        canvas.height = outH + pad * 2;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, sx, sy, sw, sh, pad, pad, outW, outH);
+
+        const found = tryExtractFromCanvas(canvas.width, canvas.height);
+        if (found) return found;
+      }
+
+      return null;
+    }
+
+    async function handleQrImageUpload(event) {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+
+      const statusBadge = document.getElementById('cameraStatusBadge');
+      if (statusBadge) statusBadge.textContent = 'Analyzing QR image...';
+      showToast('Scanning uploaded image...');
+
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+
+      img.onload = async function() {
+        try {
+          const rawQrData = await decodeQrFromImageElement(img);
+          URL.revokeObjectURL(objectUrl);
+
+          if (!rawQrData) {
+            if (statusBadge) statusBadge.textContent = 'Could not detect a QR code in that image. Try cropping closer to the QR code.';
+            showToast('No QR code detected in image');
+            return;
+          }
+
+          const accountsToAdd = parseQrPayloadToAccounts(rawQrData);
+          if (!accountsToAdd.length) {
+            if (statusBadge) statusBadge.textContent = `QR read, but it is not a valid 2FA setup QR code.`;
+            showToast('QR found, but not a 2FA setup code');
+            return;
+          }
+
+          stopLiveCameraScanner();
+          addMultipleAccountsAndOpenHome(accountsToAdd);
+        } catch (err) {
+          URL.revokeObjectURL(objectUrl);
+          showToast('Error decoding image file');
+        }
+      };
+
+      img.onerror = function() {
+        URL.revokeObjectURL(objectUrl);
+        showToast('Unsupported image file format');
+      };
+
+      img.src = objectUrl;
+    }
+
+    // Explicit User-Gesture Camera Permission Request + Live Scanner
+    async function requestCameraPermissionAndStart() {
+      stopLiveCameraScanner();
+      const video = document.getElementById('qrVideo');
+      const canvas = document.getElementById('qrCanvas');
+      const permissionOverlay = document.getElementById('cameraPermissionOverlay');
+      const statusBadge = document.getElementById('cameraStatusBadge');
+      if (!video || !canvas) return;
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (statusBadge) {
+          statusBadge.textContent = 'Camera access requires HTTPS or localhost. Use "Upload QR Photo / Screenshot" below.';
+        }
+        showToast('Camera requires HTTPS or localhost');
+        return;
+      }
+
+      if (statusBadge) statusBadge.textContent = 'Requesting camera permission...';
+
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: currentFacingMode },
+            width: { ideal: 1080 },
+            height: { ideal: 1080 }
+          },
+          audio: false
+        });
+
+        cameraPermissionGranted = true;
+        if (permissionOverlay) permissionOverlay.classList.add('hidden');
+        video.srcObject = cameraStream;
+        video.setAttribute('playsinline', 'true');
+        await video.play();
+        if (statusBadge) statusBadge.textContent = 'Point camera at a 2FA QR code';
+
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        const scanTick = () => {
+          if (!cameraStream) return;
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            if (window.jsQR) {
+              const found = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'attemptBoth'
+              });
+              if (found && found.data) {
+                const accountsToAdd = parseQrPayloadToAccounts(found.data);
+                if (accountsToAdd.length > 0) {
+                  if (navigator.vibrate) navigator.vibrate(100);
+                  stopLiveCameraScanner();
+                  addMultipleAccountsAndOpenHome(accountsToAdd);
+                  return;
+                } else if (statusBadge) {
+                  statusBadge.textContent = 'QR detected, but not a valid 2FA otpauth:// code';
+                }
+              }
+            }
+          }
+          qrRafId = requestAnimationFrame(scanTick);
+        };
+
+        qrRafId = requestAnimationFrame(scanTick);
+      } catch (err) {
+        cameraPermissionGranted = false;
+        if (permissionOverlay) permissionOverlay.classList.remove('hidden');
+        if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+          if (statusBadge) statusBadge.textContent = 'Camera permission was denied. Please allow camera access in your browser address bar, or upload a QR image below.';
+          showToast('Camera permission denied by browser');
+        } else {
+          if (statusBadge) statusBadge.textContent = 'No camera detected on this device. Tap "Upload QR Photo / Screenshot" below.';
+          showToast('Camera unavailable — upload QR image instead');
+        }
+      }
+    }
+
+    function stopLiveCameraScanner() {
+      if (qrRafId) {
+        cancelAnimationFrame(qrRafId);
+        qrRafId = null;
+      }
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+      }
+      torchEnabled = false;
+    }
+
+    async function toggleHardwareTorch() {
+      if (!cameraStream) {
+        showToast('Tap "Allow Camera Scan" first to use flashlight');
+        return;
+      }
+      const track = cameraStream.getVideoTracks()[0];
+      if (!track || !track.getCapabilities) {
+        showToast('Flashlight not supported on this device');
+        return;
+      }
+      const caps = track.getCapabilities();
+      if (!caps.torch) {
+        showToast('Hardware flashlight unavailable on current lens');
+        return;
+      }
+      try {
+        torchEnabled = !torchEnabled;
+        await track.applyConstraints({ advanced: [{ torch: torchEnabled }] });
+        const torchBtn = document.getElementById('torchToggleBtn');
+        if (torchBtn) {
+          torchBtn.className = torchEnabled
+            ? 'w-12 h-12 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-lg transition'
+            : 'w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center backdrop-blur transition';
+        }
+        showToast(torchEnabled ? 'Flashlight ON' : 'Flashlight OFF');
+      } catch (err) {
+        showToast('Could not toggle hardware flashlight');
+      }
+    }
+
+    function switchCameraLens() {
+      currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+      requestCameraPermissionAndStart();
+    }
+
+    function addMultipleAccountsAndOpenHome(parsedList) {
+      let addedCount = 0;
+      for (const parsed of parsedList.reverse()) {
+        const newAcc = {
+          id: 'acc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          issuer: parsed.issuer,
+          account: parsed.account,
+          secret: cleanBase32Input(parsed.secret),
+          algorithm: parsed.algorithm || 'SHA-1',
+          digits: Number(parsed.digits) === 8 ? 8 : 6,
+          period: Number(parsed.period) || 30,
+          icon: inferServiceBrand(parsed.issuer, parsed.account)
+        };
+        state.accounts.unshift(newAcc);
+        addedCount++;
+      }
+      saveState();
+      updateAllTotpCodes().then(() => {
+        if (addedCount === 1) {
+          showToast(`Added ${parsedList[0].issuer} (${parsedList[0].account})`);
+        } else {
+          showToast(`Imported ${addedCount} accounts from QR`);
+        }
+        navigate('home');
+      });
+    }
+
+    /*************************************************************************
+     * 5. BRAND LOGOS & SOFT FADED BLUE LETTER AVATARS
+     *************************************************************************/
+    function inferServiceBrand(issuer, account = '') {
+      const source = `${String(issuer || '')} ${String(account || '')}`.toLowerCase();
+      const rules = [
+        [/\bgoogle|gmail|youtube|google workspace\b/, 'google'],
+        [/\bmicrosoft|outlook|office 365|azure|live.com\b/, 'microsoft'],
+        [/\bgithub\b/, 'github'], [/\bamazon|aws\b/, 'amazon'],
+        [/\bdiscord\b/, 'discord'], [/\bfacebook|meta\b/, 'facebook'],
+        [/\binstagram\b/, 'instagram'], [/\blinkedin\b/, 'linkedin'],
+        [/\bapple|icloud\b/, 'apple'], [/\bnetflix\b/, 'netflix'],
+        [/\bdropbox\b/, 'dropbox'], [/\btelegram\b/, 'telegram'],
+        [/\btiktok\b/, 'tiktok'], [/\bpaypal\b/, 'paypal'],
+        [/(^|[^a-z])x(\.com| twitter)?([^a-z]|$)|\btwitter\b/, 'x'],
+        [/\bsteam\b/, 'steam'], [/\bspotify\b/, 'spotify'],
+        [/\bcoinbase\b/, 'coinbase'], [/\bbinance\b/, 'binance'],
+        [/\bbitbucket\b/, 'bitbucket'], [/\bcloudflare\b/, 'cloudflare']
+      ];
+      for (const [pattern, brand] of rules) if (pattern.test(source)) return brand;
+      return String(issuer || '').trim().toLowerCase() || 'custom';
+    }
+
+    function getServiceLogo(iconKey, sizeClass = 'w-10 h-10') {
+      const raw = String(iconKey || 'A').trim();
+      const key = inferServiceBrand(raw, '');
+
+      if (key.includes('google')) {
+        return `
+          <div class="${sizeClass} rounded-full bg-white shadow-sm border border-slate-100 flex items-center justify-center shrink-0">
+            <svg class="w-3/5 h-3/5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96z"/>
+            </svg>
+          </div>`;
+      }
+      if (key.includes('github')) {
+        return `
+          <div class="${sizeClass} rounded-full bg-slate-900 text-white flex items-center justify-center shrink-0">
+            <svg class="w-3/5 h-3/5 fill-current" viewBox="0 0 24 24">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+            </svg>
+          </div>`;
+      }
+      if (key.includes('microsoft')) {
+        return `
+          <div class="${sizeClass} rounded-full bg-white shadow-sm border border-slate-100 flex items-center justify-center shrink-0">
+            <svg class="w-1/2 h-1/2" viewBox="0 0 21 21">
+              <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+              <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+              <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+              <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+            </svg>
+          </div>`;
+      }
+      if (key.includes('discord')) {
+        return `
+          <div class="${sizeClass} rounded-full bg-[#5865F2] text-white flex items-center justify-center shrink-0">
+            <svg class="w-3/5 h-3/5 fill-current" viewBox="0 0 24 24">
+              <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+            </svg>
+          </div>`;
+      }
+      if (key.includes('amazon')) {
+        return `
+          <div class="${sizeClass} rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-lg shrink-0">
+            a
+          </div>`;
+      }
+      if (key === 'facebook') return `<div class="${sizeClass} rounded-full bg-[#1877F2] text-white flex items-end justify-center overflow-hidden shrink-0"><svg class="w-3/5 h-3/5 fill-current" viewBox="0 0 24 24"><path d="M13.5 21v-8h2.7l.4-3.1h-3.1v-2c0-.9.3-1.5 1.6-1.5h1.7V3.6c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.5-4 4.2v2.2H7.7V13h2.7v8z"/></svg></div>`;
+      if (key === 'instagram') return `<div class="${sizeClass} rounded-full flex items-center justify-center shrink-0" style="background:radial-gradient(circle at 30% 110%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%)"><svg class="w-3/5 h-3/5" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="white" stroke="none"/></svg></div>`;
+      if (key === 'linkedin') return `<div class="${sizeClass} rounded-full bg-[#0A66C2] text-white flex items-center justify-center shrink-0"><svg class="w-3/5 h-3/5 fill-current" viewBox="0 0 24 24"><path d="M5.2 8.5H2.1V22h3.1zM3.65 2A1.8 1.8 0 1 0 3.7 5.6 1.8 1.8 0 0 0 3.65 2zM22 13.8c0-4.1-2.2-6-5.1-6a4.4 4.4 0 0 0-4 2.2V8.5H9.8V22h3.1v-7.2c0-1.9.4-3.8 2.8-3.8s2.5 2.2 2.5 3.9V22H22z"/></svg></div>`;
+      if (key === 'apple') return `<div class="${sizeClass} rounded-full bg-black text-white flex items-center justify-center shrink-0"><svg class="w-3/5 h-3/5 fill-current" viewBox="0 0 24 24"><path d="M16.4 12.8c0-2.3 1.9-3.4 2-3.5a4.4 4.4 0 0 0-3.5-1.9c-1.5-.2-2.9.9-3.7.9s-2-.9-3.3-.9a4.9 4.9 0 0 0-4.1 2.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.5 1.3-.1 1.8-.8 3.4-.8s2 .8 3.4.8 2.3-1.2 3.2-2.5a11 11 0 0 0 1.5-3 4.2 4.2 0 0 1-3.4-4.3zM14 5.7a4.3 4.3 0 0 0 1-3.1 4.5 4.5 0 0 0-2.9 1.5 4.1 4.1 0 0 0-1 3 3.7 3.7 0 0 0 2.9-1.4z"/></svg></div>`;
+      if (key === 'netflix') return `<div class="${sizeClass} rounded-full bg-black text-[#E50914] flex items-center justify-center font-black text-2xl shrink-0">N</div>`;
+      if (key === 'dropbox') return `<div class="${sizeClass} rounded-full bg-white border border-slate-100 flex items-center justify-center shrink-0"><svg class="w-3/5 h-3/5" viewBox="0 0 24 24"><path fill="#0061FF" d="M7 2 1 6l6 4 6-4zm10 0-6 4 6 4 6-4zM1 14l6 4 6-4-6-4zm16-4-6 4 6 4 6-4zM7 19l5 3 5-3-5-3z"/></svg></div>`;
+      if (key === 'telegram') return `<div class="${sizeClass} rounded-full bg-[#24A1DE] text-white flex items-center justify-center shrink-0"><svg class="w-3/5 h-3/5 fill-current" viewBox="0 0 24 24"><path d="m21.8 4.2-3.3 15.5c-.2 1.1-.8 1.3-1.7.8l-4.7-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.4-4.8 8.8-8c.4-.4-.1-.6-.6-.2L6.5 13.6 1.9 12.2c-1-.3-1-1 .2-1.5L20 3.8c.8-.3 2-.1 1.8.4z"/></svg></div>`;
+      if (key === 'tiktok') return `<div class="${sizeClass} rounded-full bg-black text-white flex items-center justify-center shrink-0"><svg class="w-3/5 h-3/5 fill-current" viewBox="0 0 24 24"><path d="M19.6 6.3a5.5 5.5 0 0 1-3.4-3.8V2h-3.7v13.8a2.8 2.8 0 1 1-2.8-2.8c.5 0 .9.1 1.3.3V9.5a6.5 6.5 0 1 0 5.2 6.3V8.7a9 9 0 0 0 5.2 1.7V6.8c-.6 0-1.2-.2-1.8-.5z"/></svg></div>`;
+      if (key === 'paypal') return `<div class="${sizeClass} rounded-full bg-white border border-slate-100 flex items-center justify-center shrink-0"><span class="font-black italic text-[#003087] text-xl">P</span></div>`;
+      if (key === 'x') return `<div class="${sizeClass} rounded-full bg-black text-white flex items-center justify-center font-bold text-xl shrink-0">𝕏</div>`;
+      if (key === 'steam') return `<div class="${sizeClass} rounded-full bg-[#171A21] text-white flex items-center justify-center font-black text-lg shrink-0">S</div>`;
+      if (key === 'spotify') return `<div class="${sizeClass} rounded-full bg-[#1DB954] text-black flex items-center justify-center font-black text-xl shrink-0">≋</div>`;
+      if (key === 'coinbase') return `<div class="${sizeClass} rounded-full bg-[#0052FF] text-white flex items-center justify-center font-black text-xl shrink-0">C</div>`;
+      if (key === 'binance') return `<div class="${sizeClass} rounded-full bg-[#F3BA2F] text-black flex items-center justify-center font-black text-xl shrink-0">◆</div>`;
+      if (key === 'bitbucket') return `<div class="${sizeClass} rounded-full bg-[#2684FF] text-white flex items-center justify-center font-black text-xl shrink-0">B</div>`;
+      if (key === 'cloudflare') return `<div class="${sizeClass} rounded-full bg-[#F38020] text-white flex items-center justify-center font-black text-xl shrink-0">☁</div>`;
+
+      // Deterministic Soft Faded Blue / Cool Tint Letter Avatar
+      let hash = 0;
+      for (let i = 0; i < raw.length; i++) {
+        hash = raw.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const palette = LETTER_AVATAR_STYLES[Math.abs(hash) % LETTER_AVATAR_STYLES.length];
+      const words = raw.split(/[\s._-]+/).filter(Boolean);
+      const initials = words.length >= 2
+        ? (words[0][0] + words[1][0]).toUpperCase()
+        : raw.slice(0, 2).toUpperCase();
+
+      return `
+        <div
+          class="${sizeClass} rounded-full flex items-center justify-center font-extrabold text-sm tracking-tight shrink-0 shadow-sm"
+          style="background: ${palette.bg}; color: ${palette.text}; border: 1.5px solid ${palette.border};"
+        >
+          ${escapeHtml(initials)}
+        </div>`;
+    }
+
+    function getShieldGraphic(size = 'w-20 h-20', lightOutline = false) {
+      return `
+        <div class="authly-mark relative flex items-center justify-center ${size}" aria-label="Authly security logo" role="img">
+          <svg viewBox="0 0 100 112" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <path d="M50 3 L91 19 Q96 21 96 29 V56 Q96 87 50 109 Q4 87 4 56 V29 Q4 21 9 19 Z" fill="#087CF0"/>
+            <path d="M34 52 V37 A16 16 0 0 1 66 37 V52" fill="none" stroke="#FFFFFF" stroke-width="6.2" stroke-linecap="round"/>
+            <rect x="25" y="49" width="50" height="39" rx="7" fill="#FFFFFF"/>
+            <circle cx="50" cy="64" r="4.7" fill="#087CF0"/>
+            <path d="M47.4 66.5 H52.6 L55 77 H45 Z" fill="#087CF0"/>
+          </svg>
+        </div>`;
+    }
+
+    /*************************************************************************
+     * 6. NAVIGATION & ALL SCREENS RENDERER (DISTINCT HOME & ACCOUNTS TABS)
+     *************************************************************************/
+    function navigate(screen, options = {}) {
+      if (state.currentScreen === 'qr-scanner' && screen !== 'qr-scanner') {
+        stopLiveCameraScanner();
+      }
+      if (options.accountId) state.selectedAccountId = options.accountId;
+      if (options.prefillService !== undefined) state.prefillService = options.prefillService;
+      if (options.pinMode) {
+        state.pinMode = options.pinMode;
+        state.pinBuffer = '';
+        state.pinError = false;
+      }
+      if (state.currentScreen !== screen) {
+        state.previousScreen = state.currentScreen;
+      }
+      state.currentScreen = screen;
+      render();
+
+      if (screen === 'qr-scanner') {
+        setTimeout(() => requestCameraPermissionAndStart(), 100);
+      }
+    }
+
+    function updateStatusBarAppearance(screen) {
+      const bar = document.getElementById('statusBar');
+      if (!bar) return;
+      const darkScreens = ['splash', 'account-details', 'qr-scanner', 'pin-lock'];
+      if (darkScreens.includes(screen)) {
+        bar.className = 'w-full px-6 pt-3 pb-2 flex items-center justify-between text-xs font-semibold z-30 text-white shrink-0';
+        if (screen === 'splash' || screen === 'pin-lock' || screen === 'account-details') {
+          bar.style.background = 'var(--accent)';
+        } else {
+          bar.style.background = '#1C1917';
+        }
+      } else {
+        bar.className = 'w-full px-6 pt-3 pb-2 flex items-center justify-between text-xs font-semibold z-30 text-main shrink-0';
+        bar.style.background = 'transparent';
+      }
+    }
+
+    // Distinct Navigation for Home, Accounts, and Settings Tabs
+    function renderBottomNav(activeTab) {
+      return `
+        <div class="card-surface border-t px-6 py-2.5 flex items-center justify-around shrink-0 z-20">
+          <button onclick="navigate('home')" class="flex flex-col items-center gap-1 px-3 py-0.5 rounded-xl transition ${activeTab === 'home' ? 'text-accent font-bold' : 'text-sub hover:text-main'}">
+            <i data-lucide="home" class="w-5 h-5"></i>
+            <span class="text-[11px]">Home</span>
+          </button>
+          <button onclick="navigate('accounts')" class="flex flex-col items-center gap-1 px-3 py-0.5 rounded-xl transition ${activeTab === 'accounts' ? 'text-accent font-bold' : 'text-sub hover:text-main'}">
+            <i data-lucide="users" class="w-5 h-5"></i>
+            <span class="text-[11px]">Accounts</span>
+          </button>
+          <button onclick="navigate('settings')" class="flex flex-col items-center gap-1 px-3 py-0.5 rounded-xl transition ${activeTab === 'settings' ? 'text-accent font-bold' : 'text-sub hover:text-main'}">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+            <span class="text-[11px]">Settings</span>
+          </button>
+        </div>
+      `;
+    }
+
+    function finishOnboarding() {
+      state.settings.hasCompletedOnboarding = true;
+      saveState();
+      navigate('home');
+    }
+
+    function render() {
+      const viewport = document.getElementById('screenViewport');
+      const s = state.currentScreen;
+      updateStatusBarAppearance(s);
+
+      let html = '';
+
+      // 1. SPLASH SCREEN
+      if (s === 'splash') {
+        html = `
+          <div class="flex-1 bg-accent-gradient text-white flex flex-col items-center justify-between p-8 screen-enter">
+            <div class="mt-10"></div>
+            <div class="flex flex-col items-center text-center">
+              ${getShieldGraphic('w-36 h-40', true)}
+              <h1 class="text-4xl font-extrabold tracking-tight mt-6">Authly</h1>
+              <p class="text-sm text-white/85 mt-2 font-medium">Your Codes. Your Security.</p>
+            </div>
+            <div class="w-full flex flex-col items-center gap-5 mb-4">
+              <div class="w-48 h-1 bg-white/25 rounded-full overflow-hidden">
+                <div class="h-full bg-white rounded-full transition-all duration-1000" style="width: 100%"></div>
+              </div>
+              <p class="text-xs text-white/85 tracking-wider font-medium">Secure &bull; Fast &bull; Offline</p>
+            </div>
+          </div>
+        `;
+      }
+
+      // 2. ONBOARDING 1: SIMPLE & SECURE
+      else if (s === 'onboarding-1') {
+        html = `
+          <div class="flex-1 flex flex-col justify-between p-7 text-center screen-enter">
+            <div class="mt-2 flex flex-col items-center">
+              <div class="w-60 h-60 rounded-full bg-accent-soft flex items-center justify-center relative my-3">
+                <div class="w-32 h-48 bg-white dark:bg-slate-800 rounded-3xl shadow-xl border-4 border-slate-800 flex flex-col items-center justify-center p-3">
+                  ${getShieldGraphic('w-16 h-16', false)}
+                  <div class="flex gap-1.5 mt-4">
+                    <span class="w-2 h-2 rounded-full bg-accent"></span>
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                  </div>
+                </div>
+                <div class="absolute top-8 left-4">${getServiceLogo('google', 'w-10 h-10')}</div>
+                <div class="absolute bottom-10 left-5">${getServiceLogo('microsoft', 'w-10 h-10')}</div>
+                <div class="absolute top-10 right-4">${getServiceLogo('microsoft', 'w-10 h-10')}</div>
+                <div class="absolute bottom-10 right-4">${getServiceLogo('github', 'w-10 h-10')}</div>
+              </div>
+              <h2 class="text-2xl font-bold text-main mt-3">Simple &amp; Secure</h2>
+              <p class="text-sm text-sub mt-2.5 leading-relaxed max-w-xs">
+                Get verification codes for your accounts. Authly keeps your data safe and private.
+              </p>
+            </div>
+            <div class="flex flex-col items-center gap-4 mb-2">
+              <div class="flex gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-accent"></span>
+                <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+              </div>
+              <button onclick="navigate('onboarding-2')" class="w-full py-3.5 bg-accent text-white font-semibold rounded-xl shadow-lg active:scale-[0.99] transition">
+                Next
+              </button>
+              <button onclick="finishOnboarding()" class="text-sm font-medium text-accent py-1">Skip</button>
+            </div>
+          </div>
+        `;
+      }
+
+      // 3. ONBOARDING 2: SCAN & ADD
+      else if (s === 'onboarding-2') {
+        html = `
+          <div class="flex-1 flex flex-col justify-between p-7 text-center screen-enter">
+            <div class="mt-2 flex flex-col items-center">
+              <div class="w-60 h-60 rounded-full bg-accent-soft flex items-center justify-center relative my-3">
+                <div class="w-32 h-48 bg-white dark:bg-slate-800 rounded-3xl shadow-xl border-4 border-slate-800 flex flex-col items-center justify-center p-3">
+                  <div class="w-20 h-20 border-2 border-accent rounded-xl flex items-center justify-center p-2">
+                    <i data-lucide="qr-code" class="w-14 h-14 text-slate-800 dark:text-white"></i>
+                  </div>
+                  <div class="w-16 h-2 bg-slate-200 dark:bg-slate-700 rounded-full mt-4"></div>
+                </div>
+              </div>
+              <h2 class="text-2xl font-bold text-main mt-3">Scan &amp; Add</h2>
+              <p class="text-sm text-sub mt-2.5 leading-relaxed max-w-xs">
+                Scan QR codes or enter setup keys to add your accounts in seconds.
+              </p>
+            </div>
+            <div class="flex flex-col items-center gap-4 mb-2">
+              <div class="flex gap-2">
+                <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-accent"></span>
+                <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+              </div>
+              <button onclick="navigate('onboarding-3')" class="w-full py-3.5 bg-accent text-white font-semibold rounded-xl shadow-lg active:scale-[0.99] transition">
+                Next
+              </button>
+              <button onclick="finishOnboarding()" class="text-sm font-medium text-accent py-1">Skip</button>
+            </div>
+          </div>
+        `;
+      }
+
+      // 4. ONBOARDING 3: GET YOUR CODES
+      else if (s === 'onboarding-3') {
+        html = `
+          <div class="flex-1 flex flex-col justify-between p-7 text-center screen-enter">
+            <div class="mt-2 flex flex-col items-center">
+              <div class="w-60 h-60 rounded-full bg-accent-soft flex items-center justify-center relative my-3">
+                <div class="w-36 h-48 bg-white dark:bg-slate-800 rounded-3xl shadow-xl border-4 border-slate-800 flex flex-col items-center justify-center p-3">
+                  <span class="text-xl font-extrabold text-accent tracking-wider font-mono-code">123 456</span>
+                  <div class="w-10 h-10 rounded-full border-4 border-accent border-t-transparent animate-spin mt-4"></div>
+                </div>
+              </div>
+              <h2 class="text-2xl font-bold text-main mt-3">Get Your Codes</h2>
+              <p class="text-sm text-sub mt-2.5 leading-relaxed max-w-xs">
+                Your 6-digit codes refresh every 30 seconds. Just copy and use them when you need.
+              </p>
+            </div>
+            <div class="flex flex-col items-center gap-4 mb-6">
+              <div class="flex gap-2">
+                <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-accent"></span>
+              </div>
+              <button onclick="finishOnboarding()" class="w-full py-3.5 bg-accent text-white font-semibold rounded-xl shadow-lg active:scale-[0.99] transition">
+                Get Started
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      // 5. HOME SCREEN (LIVE 2FA CODES + INSTANT COPY + EMPTY STATE IF NO ACCOUNTS)
+      else if (s === 'home') {
+        const q = state.searchQuery.trim().toLowerCase();
+        const filtered = state.accounts.filter(a =>
+          a.issuer.toLowerCase().includes(q) || a.account.toLowerCase().includes(q)
+        );
+        const radius = 14;
+        const circumference = 2 * Math.PI * radius;
+
+        html = `
+          <div class="flex-1 flex flex-col overflow-hidden screen-enter">
+            <!-- Header -->
+            <div class="px-5 pt-2 pb-3 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-accent flex items-center justify-center text-white shadow-sm">
+                  <i data-lucide="shield" class="w-4 h-4"></i>
+                </div>
+                <span class="text-xl font-bold text-main tracking-tight">Authly</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <button onclick="toggleGlobalMaskCodes()" title="${state.settings.maskCodes ? 'Show Codes' : 'Mask Codes'}" class="p-2 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 ${state.settings.maskCodes ? 'text-accent bg-accent-soft' : 'text-main'} transition">
+                  <i data-lucide="${state.settings.maskCodes ? 'eye-off' : 'eye'}" class="w-4 h-4"></i>
+                </button>
+                ${state.settings.appLock ? `
+                  <button onclick="lockAppNow()" title="Lock App Now" class="p-2 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-main">
+                    <i data-lucide="lock" class="w-4 h-4"></i>
+                  </button>
+                ` : ''}
+                <button onclick="navigate('privacy-security')" title="Privacy & Security" class="p-2 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-main">
+                  <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                </button>
+              </div>
+            </div>
+
+            ${state.accounts.length === 0 ? `
+              <!-- Empty State Inside Home Tab -->
+              <div class="flex-1 flex flex-col items-center justify-center p-7 text-center">
+                <div class="w-32 h-32 rounded-full bg-accent-soft flex items-center justify-center mb-5">
+                  ${getShieldGraphic('w-18 h-18', false)}
+                </div>
+                <h2 class="text-xl font-bold text-main">No Accounts Yet</h2>
+                <p class="text-xs text-sub mt-2 max-w-[230px] leading-relaxed">
+                  Add your first account to get started with Authly.
+                </p>
+                <button onclick="navigate('add-options')" class="mt-6 w-full max-w-[230px] py-3.5 px-6 bg-accent text-white font-semibold text-sm rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition">
+                  <i data-lucide="plus" class="w-4 h-4"></i>
+                  <span>Add Account</span>
+                </button>
+              </div>
+            ` : `
+              <!-- Search Bar -->
+              <div class="px-5 mb-3">
+                <div class="card-surface rounded-xl px-3.5 py-2.5 flex items-center gap-2.5 shadow-sm">
+                  <i data-lucide="search" class="w-4 h-4 text-sub"></i>
+                  <input
+                    id="homeSearchInput"
+                    type="text"
+                    placeholder="Search accounts..."
+                    value="${escapeHtml(state.searchQuery)}"
+                    oninput="handleSearch(this.value)"
+                    class="bg-transparent text-sm text-main placeholder-slate-400 focus:outline-none w-full"
+                  />
+                  ${state.searchQuery ? `<button onclick="handleSearch('')" class="text-sub"><i data-lucide="x" class="w-4 h-4"></i></button>` : ''}
+                </div>
+              </div>
+
+              <!-- Account Cards List -->
+              <div class="flex-1 overflow-y-auto px-5 pb-20 space-y-3 no-scrollbar">
+                ${filtered.length === 0 ? `
+                  <div class="text-center py-12 text-sub text-xs">No matching accounts for "${escapeHtml(state.searchQuery)}"</div>
+                ` : filtered.map(acc => {
+                  const entry = totpCache[acc.id] || { code: '--- ---', remaining: 30, period: 30 };
+                  const offset = circumference - (entry.remaining / entry.period) * circumference;
+                  const displayCode = getDisplayTotpCode(acc.id);
+                  const isMasked = state.settings.maskCodes && !state.revealedAccountIds[acc.id];
+                  return `
+                    <div onclick="navigate('account-details', { accountId: '${acc.id}' })" class="card-surface rounded-2xl p-4 shadow-sm hover:shadow-md cursor-pointer flex items-center justify-between active:scale-[0.99] transition">
+                      <div class="flex items-center gap-3.5 min-w-0">
+                        ${getServiceLogo(acc.icon === 'custom' ? acc.issuer : (acc.icon || acc.issuer), 'w-11 h-11')}
+                        <div class="min-w-0">
+                          <h3 class="font-bold text-sm text-main truncate">${escapeHtml(acc.issuer)}</h3>
+                          <p class="text-xs text-sub truncate">${escapeHtml(acc.account)}</p>
+                          <div class="flex items-center gap-2 mt-1">
+                            <span class="text-xl font-extrabold text-accent tracking-wider font-mono-code ${isMasked ? 'otp-mask-animate' : ''}" data-totp-code="${acc.id}">${displayCode}</span>
+                            ${state.settings.maskCodes ? `
+                              <button onclick="event.stopPropagation(); toggleRevealSingleAccount('${acc.id}')" class="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-sub hover:text-accent" title="${isMasked ? 'Reveal code' : 'Hide code'}">
+                                <i data-lucide="${isMasked ? 'eye' : 'eye-off'}" class="w-3.5 h-3.5"></i>
+                              </button>
+                            ` : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2.5 shrink-0">
+                        <button onclick="event.stopPropagation(); copyTotpCode('${acc.id}')" class="p-2 rounded-xl bg-accent-soft text-accent hover:opacity-90 active:scale-90 transition" title="Copy Code">
+                          <i data-lucide="copy" class="w-4 h-4"></i>
+                        </button>
+                        <div class="relative w-9 h-9 flex items-center justify-center">
+                          <svg class="w-9 h-9">
+                            <circle class="text-slate-200 dark:text-slate-700" stroke-width="2.5" stroke="currentColor" fill="transparent" r="${radius}" cx="18" cy="18"/>
+                            <circle
+                              class="progress-ring__circle"
+                              data-totp-ring="${acc.id}"
+                              stroke-width="2.5"
+                              stroke-linecap="round"
+                              stroke="${entry.remaining <= 5 ? '#EF4444' : 'var(--accent)'}"
+                              fill="transparent"
+                              r="${radius}"
+                              cx="18"
+                              cy="18"
+                              style="stroke-dasharray: ${circumference} ${circumference}; stroke-dashoffset: ${offset};"
+                            />
+                          </svg>
+                          <span class="absolute text-[10px] font-bold text-main" data-totp-timer="${acc.id}">${entry.remaining}</span>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+
+              <!-- Floating + Add Account Button -->
+              <button onclick="navigate('add-options')" title="Add Account" class="absolute bottom-16 right-5 p-3.5 rounded-full bg-accent text-white shadow-xl flex items-center justify-center hover:scale-105 active:scale-95 transition z-30">
+                <i data-lucide="plus" class="w-6 h-6"></i>
+              </button>
+            `}
+
+            ${renderBottomNav('home')}
+          </div>
+        `;
+      }
+
+      // 6. DEDICATED ACCOUNTS MANAGEMENT TAB SCREEN
+      else if (s === 'accounts') {
+        html = `
+          <div class="flex-1 flex flex-col overflow-hidden screen-enter">
+            <div class="px-5 pt-2 pb-3 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <h2 class="text-xl font-bold text-main tracking-tight">Accounts</h2>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-accent-soft text-accent">${state.accounts.length}</span>
+              </div>
+              <button onclick="navigate('add-options')" class="px-3 py-1.5 rounded-xl bg-accent text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm active:scale-95 transition">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>Add New</span>
+              </button>
+            </div>
+
+            ${state.accounts.length === 0 ? `
+              <div class="flex-1 flex flex-col items-center justify-center p-7 text-center">
+                <div class="w-28 h-28 rounded-full bg-accent-soft flex items-center justify-center mb-4">
+                  <i data-lucide="users" class="w-12 h-12 text-accent"></i>
+                </div>
+                <h3 class="text-lg font-bold text-main">No Saved Accounts</h3>
+                <p class="text-xs text-sub mt-1.5 max-w-[230px] leading-relaxed">
+                  Scan a QR code, enter a setup key, or import a backup file to manage your accounts here.
+                </p>
+                <div class="flex flex-col w-full max-w-[220px] gap-2.5 mt-6">
+                  <button onclick="navigate('add-options')" class="w-full py-3 bg-accent text-white font-semibold text-xs rounded-xl shadow flex items-center justify-center gap-1.5">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Add First Account</span>
+                  </button>
+                  <button onclick="navigate('export-import')" class="w-full py-2.5 card-surface text-main font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5">
+                    <i data-lucide="upload" class="w-3.5 h-3.5 text-accent"></i>
+                    <span>Import Backup File</span>
+                  </button>
+                </div>
+              </div>
+            ` : `
+              <div class="flex-1 overflow-y-auto px-5 pb-6 space-y-2.5 no-scrollbar">
+                ${state.accounts.map((acc, idx) => `
+                  <div class="card-surface rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-2">
+                    <div onclick="navigate('account-details', { accountId: '${acc.id}' })" class="flex items-center gap-3 min-w-0 flex-1 cursor-pointer">
+                      ${getServiceLogo(acc.icon === 'custom' ? acc.issuer : (acc.icon || acc.issuer), 'w-10 h-10')}
+                      <div class="min-w-0">
+                        <h3 class="font-bold text-sm text-main truncate">${escapeHtml(acc.issuer)}</h3>
+                        <p class="text-xs text-sub truncate">${escapeHtml(acc.account)}</p>
+                        <span class="inline-block text-[10px] font-medium text-accent bg-accent-soft px-2 py-0.5 rounded-md mt-1">
+                          ${acc.algorithm || 'SHA-1'} &bull; ${acc.digits || 6} digits &bull; ${acc.period || 30}s
+                        </span>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button onclick="moveAccountOrder(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-sub disabled:opacity-25" title="Move Up">
+                        <i data-lucide="chevron-up" class="w-4 h-4"></i>
+                      </button>
+                      <button onclick="moveAccountOrder(${idx}, 1)" ${idx === state.accounts.length - 1 ? 'disabled' : ''} class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-sub disabled:opacity-25" title="Move Down">
+                        <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                      </button>
+                      <button onclick="navigate('edit-account', { accountId: '${acc.id}' })" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-sub hover:text-accent" title="Edit Account">
+                        <i data-lucide="pencil" class="w-4 h-4"></i>
+                      </button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+
+            ${renderBottomNav('accounts')}
+          </div>
+        `;
+      }
+
+      // 7. ACCOUNT DETAILS SCREEN
+      else if (s === 'account-details') {
+        const acc = state.accounts.find(a => a.id === state.selectedAccountId) || state.accounts[0];
+        if (!acc) {
+          navigate('home');
+          return;
+        }
+        const entry = totpCache[acc.id] || { code: '--- ---', remaining: 30, period: 30 };
+        const radius = 22;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (entry.remaining / entry.period) * circumference;
+        const displayCode = getDisplayTotpCode(acc.id);
+        const isMasked = state.settings.maskCodes && !state.revealedAccountIds[acc.id];
+
+        html = `
+          <div class="flex-1 flex flex-col overflow-hidden screen-enter">
+            <!-- Top Blue Curved Hero -->
+            <div class="bg-accent pt-2 pb-16 px-5 text-white flex flex-col items-center relative rounded-b-[36px] shadow-md">
+              <div class="w-full flex items-center justify-between mb-3">
+                <button onclick="navigate('home')" class="p-1.5 rounded-xl hover:bg-white/10">
+                  <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                </button>
+                <span class="text-xs font-semibold opacity-85">Account Details</span>
+              </div>
+              ${getServiceLogo(acc.icon === 'custom' ? acc.issuer : (acc.icon || acc.issuer), 'w-16 h-16')}
+              <h2 class="text-xl font-bold mt-3">${escapeHtml(acc.issuer)}</h2>
+              <p class="text-xs text-white/85 mt-0.5">${escapeHtml(acc.account)}</p>
+            </div>
+
+            <!-- Main TOTP Code Card -->
+            <div class="px-6 -mt-10 z-10">
+              <div class="card-surface rounded-3xl p-6 shadow-xl flex flex-col items-center">
+                <div class="w-full flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2.5">
+                    <span class="text-4xl font-extrabold text-accent tracking-wider font-mono-code ${isMasked ? 'otp-mask-animate' : ''}" data-totp-code="${acc.id}">${displayCode}</span>
+                    ${state.settings.maskCodes ? `
+                      <button onclick="toggleRevealSingleAccount('${acc.id}')" class="p-2 rounded-xl bg-accent-soft text-accent" title="${isMasked ? 'Reveal code' : 'Mask code'}">
+                        <i data-lucide="${isMasked ? 'eye' : 'eye-off'}" class="w-5 h-5"></i>
+                      </button>
+                    ` : ''}
+                  </div>
+                  <div class="relative w-14 h-14 flex items-center justify-center shrink-0">
+                    <svg class="w-14 h-14">
+                      <circle class="text-slate-200 dark:text-slate-700" stroke-width="4" stroke="currentColor" fill="transparent" r="${radius}" cx="28" cy="28"/>
+                      <circle
+                        class="progress-ring__circle"
+                        data-totp-ring="${acc.id}"
+                        stroke-width="4"
+                        stroke-linecap="round"
+                        stroke="${entry.remaining <= 5 ? '#EF4444' : 'var(--accent)'}"
+                        fill="transparent"
+                        r="${radius}"
+                        cx="28"
+                        cy="28"
+                        style="stroke-dasharray: ${circumference} ${circumference}; stroke-dashoffset: ${offset};"
+                      />
+                    </svg>
+                    <span class="absolute text-xs font-bold text-accent" data-totp-timer="${acc.id}" data-suffix="s">${entry.remaining}s</span>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2.5 mt-6">
+                  <button onclick="copyTotpCode('${acc.id}')" class="px-6 py-2.5 rounded-xl border border-accent text-accent font-semibold text-sm flex items-center gap-2 hover:bg-accent-soft active:scale-95 transition">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                    <span id="detailsCopyBtnLabel">Copy</span>
+                  </button>
+                  <button onclick="toggleGlobalMaskCodes()" class="px-4 py-2.5 rounded-xl card-surface text-sub hover:text-main font-semibold text-xs flex items-center gap-1.5 transition">
+                    <i data-lucide="${state.settings.maskCodes ? 'eye' : 'eye-off'}" class="w-4 h-4"></i>
+                    <span>${state.settings.maskCodes ? 'Unmask' : 'Mask'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons Row -->
+            <div class="px-8 mt-8 flex items-center justify-around">
+              <button onclick="navigate('edit-account', { accountId: '${acc.id}' })" class="flex flex-col items-center gap-2">
+                <div class="p-3.5 rounded-2xl card-surface shadow-sm flex items-center justify-center text-main hover:text-accent">
+                  <i data-lucide="pencil" class="w-5 h-5"></i>
+                </div>
+                <span class="text-xs font-medium text-sub">Edit</span>
+              </button>
+
+              <button onclick="deleteAccount('${acc.id}')" class="flex flex-col items-center gap-2">
+                <div class="p-3.5 rounded-2xl card-surface shadow-sm flex items-center justify-center text-rose-500 hover:bg-rose-50">
+                  <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </div>
+                <span class="text-xs font-medium text-sub">Remove</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      // 8. ADD ACCOUNT OPTIONS
+      else if (s === 'add-options') {
+        html = `
+          <div class="flex-1 flex flex-col p-5 overflow-y-auto no-scrollbar screen-enter">
+            <div class="flex items-center gap-3 mb-5">
+              <button onclick="navigate('home')" class="p-1.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-main">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+              </button>
+              <h2 class="text-lg font-bold text-main">Add Account</h2>
+            </div>
+
+            <div class="space-y-3">
+              <button onclick="navigate('qr-scanner')" class="w-full card-surface p-4 rounded-2xl shadow-sm flex items-center justify-between text-left hover:border-accent transition">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-11 h-11 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+                    <i data-lucide="scan-line" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-bold text-sm text-main">Scan QR Code</h3>
+                    <p class="text-xs text-sub">Scan a QR code from your service</p>
+                  </div>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-sub"></i>
+              </button>
+
+              <button onclick="navigate('setup-key', { prefillService: null })" class="w-full card-surface p-4 rounded-2xl shadow-sm flex items-center justify-between text-left hover:border-accent transition">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-11 h-11 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+                    <i data-lucide="key-round" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-bold text-sm text-main">Enter Setup Key</h3>
+                    <p class="text-xs text-sub">Manually enter your setup key</p>
+                  </div>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-sub"></i>
+              </button>
+            </div>
+
+            <h3 class="text-xs font-bold uppercase tracking-wider text-sub mt-7 mb-3 px-1">Popular Services</h3>
+            <div class="space-y-2.5">
+              ${POPULAR_SERVICES.map(srv => `
+                <button onclick="navigate('setup-key', { prefillService: '${srv.name}' })" class="w-full card-surface px-4 py-3 rounded-2xl shadow-sm flex items-center justify-between hover:border-accent transition">
+                  <div class="flex items-center gap-3">
+                    ${getServiceLogo(srv.icon, 'w-8 h-8')}
+                    <span class="font-semibold text-sm text-main">${srv.name}</span>
+                  </div>
+                  <i data-lucide="chevron-right" class="w-4 h-4 text-sub"></i>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      // 9. QR SCANNER SCREEN WITH EXPLICIT CAMERA PERMISSION BUTTON + IMAGE UPLOAD
+      else if (s === 'qr-scanner') {
+        html = `
+          <div class="flex-1 bg-stone-950 text-white flex flex-col justify-between p-5 relative overflow-hidden screen-enter">
+            <!-- Top Bar -->
+            <div class="flex items-center justify-between z-20">
+              <button onclick="navigate('add-options')" class="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+              </button>
+              <span class="text-sm font-semibold">Scan QR Code</span>
+              <div class="flex items-center gap-2">
+                <button onclick="switchCameraLens()" title="Switch Camera" class="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur">
+                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                </button>
+                <button onclick="document.getElementById('qrImageInput').click()" title="Upload QR Image" class="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur">
+                  <i data-lucide="image" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Live Camera Viewfinder Reticle -->
+            <div class="my-auto flex flex-col items-center z-20">
+              <div class="w-60 h-60 relative flex items-center justify-center rounded-3xl overflow-hidden bg-stone-900 shadow-2xl border border-white/10">
+                <video id="qrVideo" class="absolute inset-0 w-full h-full object-cover" playsinline muted></video>
+                <canvas id="qrCanvas" class="hidden"></canvas>
+
+                <!-- Explicit Camera Permission Trigger Overlay -->
+                <div id="cameraPermissionOverlay" class="${cameraPermissionGranted ? 'hidden' : ''} absolute inset-0 bg-stone-900/95 flex flex-col items-center justify-center p-5 text-center z-10">
+                  <div class="w-12 h-12 rounded-2xl bg-accent/20 text-accent flex items-center justify-center mb-3">
+                    <i data-lucide="camera" class="w-6 h-6"></i>
+                  </div>
+                  <p class="text-xs font-semibold text-white mb-1">Camera Access Required</p>
+                  <p class="text-[11px] text-stone-400 mb-4 leading-snug">Tap below to grant browser camera permission for live QR scanning</p>
+                  <button onclick="requestCameraPermissionAndStart()" class="px-4 py-2 rounded-xl bg-accent text-white text-xs font-semibold shadow-lg active:scale-95 transition">
+                    Allow Camera Access
+                  </button>
+                </div>
+
+                <!-- Corner Framing Brackets -->
+                <div class="absolute top-3 left-3 w-8 h-8 border-t-4 border-l-4 border-accent rounded-tl-xl pointer-events-none z-20"></div>
+                <div class="absolute top-3 right-3 w-8 h-8 border-t-4 border-r-4 border-accent rounded-tr-xl pointer-events-none z-20"></div>
+                <div class="absolute bottom-3 left-3 w-8 h-8 border-b-4 border-l-4 border-accent rounded-bl-xl pointer-events-none z-20"></div>
+                <div class="absolute bottom-3 right-3 w-8 h-8 border-b-4 border-r-4 border-accent rounded-br-xl pointer-events-none z-20"></div>
+
+                <div class="scanner-laser z-20"></div>
+              </div>
+
+              <p id="cameraStatusBadge" class="text-xs text-white/85 mt-5 font-medium text-center max-w-xs px-3 leading-relaxed">
+                Scan the QR code from your service
+              </p>
+
+              <button onclick="document.getElementById('qrImageInput').click()" class="mt-3.5 text-xs bg-white/15 hover:bg-white/25 text-white font-semibold px-4 py-2.5 rounded-xl backdrop-blur flex items-center gap-2 active:scale-95 transition">
+                <i data-lucide="image-plus" class="w-4 h-4"></i>
+                <span>Upload QR Photo / Screenshot</span>
+              </button>
+            </div>
+
+            <!-- Hardware Flashlight Toggle -->
+            <div class="flex justify-center mb-2 z-20">
+              <button id="torchToggleBtn" onclick="toggleHardwareTorch()" title="Toggle Flashlight" class="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center backdrop-blur transition">
+                <i data-lucide="flashlight" class="w-5 h-5"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      // 10. SETUP KEY INPUT SCREEN
+      else if (s === 'setup-key') {
+        const prefill = state.prefillService || '';
+        html = `
+          <div class="flex-1 flex flex-col justify-between p-5 overflow-y-auto no-scrollbar screen-enter">
+            <div>
+              <div class="flex items-center gap-3 mb-4">
+                <button onclick="navigate('add-options')" class="p-1.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-main">
+                  <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                </button>
+                <h2 class="text-lg font-bold text-main">Enter Setup Key</h2>
+              </div>
+
+              <p class="text-xs text-sub leading-relaxed mb-5">
+                Enter the setup key provided by your service. It usually looks like this:<br/>
+                <strong class="text-main font-semibold select-all">JBSWY3DPEHPK3PXP</strong>.
+              </p>
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-xs font-semibold text-sub mb-1.5">Setup Key</label>
+                  <input
+                    id="setupKeySecret"
+                    type="text"
+                    placeholder="JBSW Y3DP EHPK 3PXP"
+                    class="w-full card-surface rounded-xl px-4 py-3 text-sm font-mono-code uppercase text-main focus:outline-none focus:border-accent"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-sub mb-1.5">Account Name (Optional)</label>
+                  <div class="flex items-center gap-3">
+                    <div id="setupKeyAvatarPreview">${getServiceLogo(prefill || 'A', 'w-11 h-11')}</div>
+                    <input
+                      id="setupKeyIssuer"
+                      type="text"
+                      value="${escapeHtml(prefill)}"
+                      oninput="updateSetupAvatarPreview(this.value)"
+                      placeholder="e.g. Google, AWS, Stripe"
+                      class="w-full card-surface rounded-xl px-4 py-3 text-sm text-main focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-sub mb-1.5">Email or Username (Optional)</label>
+                  <input
+                    id="setupKeyAccount"
+                    type="text"
+                    placeholder="user@example.com"
+                    class="w-full card-surface rounded-xl px-4 py-3 text-sm text-main focus:outline-none focus:border-accent"
+                  />
+                </div>
+
+                <details class="card-surface rounded-xl px-4 py-3">
+                  <summary class="text-xs font-semibold text-main cursor-pointer flex items-center justify-between">
+                    <span>Advanced Options</span>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-sub"></i>
+                  </summary>
+                  <div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 grid grid-cols-3 gap-2">
+                    <div>
+                      <label class="block text-[10px] font-semibold text-sub mb-1">Algorithm</label>
+                      <select id="setupKeyAlgo" class="w-full card-surface rounded-lg px-2 py-1.5 text-xs text-main">
+                        <option value="SHA-1">SHA-1</option>
+                        <option value="SHA-256">SHA-256</option>
+                        <option value="SHA-512">SHA-512</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-semibold text-sub mb-1">Digits</label>
+                      <select id="setupKeyDigits" class="w-full card-surface rounded-lg px-2 py-1.5 text-xs text-main">
+                        <option value="6">6 Digits</option>
+                        <option value="8">8 Digits</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-semibold text-sub mb-1">Interval</label>
+                      <select id="setupKeyPeriod" class="w-full card-surface rounded-lg px-2 py-1.5 text-xs text-main">
+                        <option value="30">30s</option>
+                        <option value="60">60s</option>
+                        <option value="15">15s</option>
+                      </select>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+
+            <button onclick="saveNewSetupKeyAccount()" class="w-full py-3.5 bg-accent text-white font-semibold rounded-xl shadow-lg active:scale-[0.99] transition mt-6">
+              Add Account
+            </button>
+          </div>
+        `;
+      }
+
+      // 11. EDIT ACCOUNT SCREEN
+      else if (s === 'edit-account') {
+        const acc = state.accounts.find(a => a.id === state.selectedAccountId) || state.accounts[0];
+        if (!acc) {
+          navigate('home');
+          return;
+        }
+        html = `
+          <div class="flex-1 flex flex-col justify-between p-5 overflow-y-auto no-scrollbar screen-enter">
+            <div>
+              <div class="flex items-center gap-3 mb-5">
+                <button onclick="navigate('account-details', { accountId: '${acc.id}' })" class="p-1.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-main">
+                  <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                </button>
+                <h2 class="text-lg font-bold text-main">Edit Account</h2>
+              </div>
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-xs font-semibold text-sub mb-1.5">Service Name</label>
+                  <input
+                    id="editIssuer"
+                    type="text"
+                    value="${escapeHtml(acc.issuer)}"
+                    oninput="previewEditLogo(document.getElementById('editIconSelect').value)"
+                    class="w-full card-surface rounded-xl px-4 py-3 text-sm font-medium text-main focus:outline-none focus:border-accent"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-sub mb-1.5">Email</label>
+                  <input
+                    id="editAccountName"
+                    type="text"
+                    value="${escapeHtml(acc.account)}"
+                    class="w-full card-surface rounded-xl px-4 py-3 text-sm text-main focus:outline-none focus:border-accent"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-sub mb-1.5">Icon</label>
+                  <div class="flex items-center gap-3">
+                    <div id="editLogoPreview">${getServiceLogo(acc.icon === 'custom' ? acc.issuer : (acc.icon || acc.issuer), 'w-12 h-12')}</div>
+                    <select id="editIconSelect" onchange="previewEditLogo(this.value)" class="card-surface rounded-xl px-3.5 py-2.5 text-xs font-medium text-main focus:outline-none flex-1">
+                      <option value="custom" ${!['google','github','microsoft','discord','amazon'].includes(acc.icon) ? 'selected' : ''}>Letter Avatar (Soft Faded Blue)</option>
+                      <option value="google" ${acc.icon === 'google' ? 'selected' : ''}>Google</option>
+                      <option value="github" ${acc.icon === 'github' ? 'selected' : ''}>GitHub</option>
+                      <option value="microsoft" ${acc.icon === 'microsoft' ? 'selected' : ''}>Microsoft</option>
+                      <option value="discord" ${acc.icon === 'discord' ? 'selected' : ''}>Discord</option>
+                      <option value="amazon" ${acc.icon === 'amazon' ? 'selected' : ''}>Amazon</option>
+                    </select>
+                  </div>
+                </div>
+
+                <details class="card-surface rounded-xl px-4 py-3">
+                  <summary class="text-xs font-semibold text-main cursor-pointer flex items-center justify-between">
+                    <span>Advanced Options</span>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-sub"></i>
+                  </summary>
+                  <div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                    <div class="grid grid-cols-3 gap-2">
+                      <div>
+                        <label class="block text-[10px] font-semibold text-sub mb-1">Algorithm</label>
+                        <select id="editAlgoSelect" class="w-full card-surface rounded-lg px-2 py-1.5 text-xs text-main">
+                          <option value="SHA-1" ${acc.algorithm === 'SHA-1' ? 'selected' : ''}>SHA-1</option>
+                          <option value="SHA-256" ${acc.algorithm === 'SHA-256' ? 'selected' : ''}>SHA-256</option>
+                          <option value="SHA-512" ${acc.algorithm === 'SHA-512' ? 'selected' : ''}>SHA-512</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-[10px] font-semibold text-sub mb-1">Digits</label>
+                        <select id="editDigitsSelect" class="w-full card-surface rounded-lg px-2 py-1.5 text-xs text-main">
+                          <option value="6" ${Number(acc.digits) === 6 ? 'selected' : ''}>6</option>
+                          <option value="8" ${Number(acc.digits) === 8 ? 'selected' : ''}>8</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-[10px] font-semibold text-sub mb-1">Period</label>
+                        <select id="editPeriodSelect" class="w-full card-surface rounded-lg px-2 py-1.5 text-xs text-main">
+                          <option value="30" ${Number(acc.period) === 30 ? 'selected' : ''}>30s</option>
+                          <option value="60" ${Number(acc.period) === 60 ? 'selected' : ''}>60s</option>
+                          <option value="15" ${Number(acc.period) === 15 ? 'selected' : ''}>15s</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+
+            <div class="space-y-2.5 mt-6">
+              <button onclick="deleteAccount('${acc.id}')" class="w-full py-3 bg-rose-50 dark:bg-rose-950/40 text-rose-600 font-semibold text-sm rounded-xl hover:bg-rose-100 transition">
+                Remove Account
+              </button>
+              <button onclick="saveEditedAccount('${acc.id}')" class="w-full py-3.5 bg-accent text-white font-semibold text-sm rounded-xl shadow-lg active:scale-[0.99] transition">
+                Save Changes
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      // 12. SETTINGS SCREEN
+      else if (s === 'settings') {
+        html = `
+          <div class="flex-1 flex flex-col overflow-hidden screen-enter">
+            <div class="px-5 pt-2 pb-3 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <button onclick="navigate('home')" class="p-1.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-main">
+                  <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                </button>
+                <h2 class="text-lg font-bold text-main">Settings</h2>
+              </div>
+              <button onclick="navigate('privacy-security')" class="p-1.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-main">
+                <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+              </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-5 pb-6 space-y-5 no-scrollbar">
+              <!-- Security Section -->
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-sub mb-2 px-1">Security</h3>
+                <div class="card-surface rounded-2xl divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden shadow-sm">
+                  <div class="p-3.5 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                      <i data-lucide="lock" class="w-4 h-4 text-accent"></i>
+                      <span class="text-sm font-medium text-main">App Lock</span>
+                    </div>
+                    <div onclick="handleAppLockToggle()" class="toggle-switch ${state.settings.appLock ? 'active' : ''}"></div>
+                  </div>
+
+                  <button onclick="startChangePinFlow()" class="w-full p-3.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <div class="flex items-center gap-3">
+                      <i data-lucide="key-round" class="w-4 h-4 text-accent"></i>
+                      <span class="text-sm font-medium text-main">${state.settings.pin ? 'Change PIN' : 'Set 4-Digit PIN'}</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-sub"></i>
+                  </button>
+
+                  <div class="p-3.5 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                      <i data-lucide="eye-off" class="w-4 h-4 text-accent"></i>
+                      <span class="text-sm font-medium text-main">Mask 2FA Codes (••• •••)</span>
+                    </div>
+                    <div onclick="toggleGlobalMaskCodes()" class="toggle-switch ${state.settings.maskCodes ? 'active' : ''}"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Appearance Section -->
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-sub mb-2 px-1">Appearance</h3>
+                <div class="card-surface rounded-2xl divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden shadow-sm">
+                  <button onclick="navigate('theme')" class="w-full p-3.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <div class="flex items-center gap-3">
+                      <i data-lucide="moon" class="w-4 h-4 text-accent"></i>
+                      <span class="text-sm font-medium text-main">Theme</span>
+                    </div>
+                    <div class="flex items-center gap-1 text-xs text-sub">
+                      <span class="capitalize">${state.settings.systemDefaultTheme ? 'System' : state.settings.theme}</span>
+                      <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                    </div>
+                  </button>
+
+                  <button onclick="navigate('theme')" class="w-full p-3.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <div class="flex items-center gap-3">
+                      <i data-lucide="palette" class="w-4 h-4 text-accent"></i>
+                      <span class="text-sm font-medium text-main">Accent Color</span>
+                    </div>
+                    <span class="w-5 h-5 rounded-full bg-accent shadow-inner"></span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- General Section -->
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-sub mb-2 px-1">General</h3>
+                <div class="card-surface rounded-2xl divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden shadow-sm">
+                  <div class="p-3.5 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                      <i data-lucide="bell" class="w-4 h-4 text-accent"></i>
+                      <span class="text-sm font-medium text-main">Notifications</span>
+                    </div>
+                    <div onclick="toggleSetting('notifications')" class="toggle-switch ${state.settings.notifications ? 'active' : ''}"></div>
+                  </div>
+
+                  <div class="p-3.5 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                      <i data-lucide="clipboard-check" class="w-4 h-4 text-accent"></i>
+                      <span class="text-sm font-medium text-main">Copy to Clipboard (30s)</span>
+                    </div>
+                    <div onclick="toggleSetting('clipboardClear30s')" class="toggle-switch ${state.settings.clipboardClear30s ? 'active' : ''}"></div>
+                  </div>
+
+                  <button onclick="navigate('export-import')" class="w-full p-3.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <div class="flex items-center gap-3">
+                      <i data-lucide="database-backup" class="w-4 h-4 text-accent"></i>
+                      <span class="text-sm font-medium text-main">Export / Import</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-sub"></i>
+                  </button>
+
+                  <button onclick="navigate('about')" class="w-full p-3.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <div class="flex items-center gap-3">
+                      <i data-lucide="info" class="w-4 h-4 text-accent"></i>
+                      <span class="text-sm font-medium text-main">About</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-sub"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            ${renderBottomNav('settings')}
+          </div>
+        `;
+      }
+
+      // 13. CLEAN, NON-OVERLAPPING ENTER PIN SCREEN (EXACT TO MOCKUP)
+      else if (s === 'pin-lock') {
+        const titleMap = {
+          'unlock': 'Enter PIN',
+          'setup-new': 'Create PIN',
+          'verify-old': 'Enter Current PIN',
+          'set-new': 'Enter New PIN',
+          'confirm-new': 'Confirm New PIN'
+        };
+        const subMap = {
+          'unlock': 'Enter your 4-digit security PIN',
+          'setup-new': 'Choose a 4-digit PIN to lock Authly',
+          'verify-old': 'Verify your existing 4-digit PIN',
+          'set-new': 'Enter a new 4-digit security PIN',
+          'confirm-new': 'Re-enter your new 4-digit PIN'
+        };
+
+        const dotsHtml = [0, 1, 2, 3].map(i => {
+          const filled = i < state.pinBuffer.length;
+          if (filled && !state.settings.hidePin) {
+            return `
+              <div class="w-8 h-8 rounded-full bg-white text-accent font-extrabold text-sm flex items-center justify-center shadow transition-all">
+                ${state.pinBuffer[i]}
+              </div>`;
+          }
+          return `
+            <span class="w-3.5 h-3.5 rounded-full transition-all duration-150 ${filled ? 'bg-white scale-110 shadow' : 'bg-white/35'}"></span>
+          `;
+        }).join('');
+
+        html = `
+          <div class="flex-1 bg-accent-gradient text-white flex flex-col justify-between px-6 py-4 overflow-y-auto no-scrollbar screen-enter">
+            <!-- Top Row: Cancel & Mask/Show PIN -->
+            <div class="w-full flex items-center justify-between shrink-0 min-h-[28px]">
+              ${state.pinMode !== 'unlock' ? `
+                <button onclick="navigate('settings')" class="text-xs font-semibold text-white/85 hover:text-white flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-white/10 transition">
+                  <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+                  <span>Back</span>
+                </button>
+              ` : `<span></span>`}
+
+              <button onclick="togglePinMaskDirect()" class="text-xs font-semibold text-white/90 hover:text-white flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-white/15 hover:bg-white/25 transition">
+                <i data-lucide="${state.settings.hidePin ? 'eye' : 'eye-off'}" class="w-3.5 h-3.5"></i>
+                <span>${state.settings.hidePin ? 'Show PIN' : 'Hide PIN'}</span>
+              </button>
+            </div>
+
+            <!-- Center Shield, Title & 4 PIN Dots -->
+            <div class="flex flex-col items-center text-center my-2 shrink-0 ${state.pinError ? 'shake-error' : ''}">
+              ${getShieldGraphic('w-16 h-16', true)}
+              <h2 class="text-xl font-bold tracking-tight mt-3">${titleMap[state.pinMode] || 'Enter PIN'}</h2>
+              <p class="text-[11px] text-white/75 mt-0.5">${subMap[state.pinMode] || ''}</p>
+              <div id="pinDots" class="flex items-center justify-center gap-4 mt-4 min-h-[32px]">
+                ${dotsHtml}
+              </div>
+            </div>
+
+            <!-- 3x4 Circular Numeric Keypad (Clean Spacing, Zero Overlap) -->
+            <div class="w-full max-w-[248px] mx-auto grid grid-cols-3 gap-x-5 gap-y-3.5 place-items-center mb-3 shrink-0">
+              ${[1,2,3,4,5,6,7,8,9].map(n => `
+                <button onclick="pressPinDigit('${n}')" class="pin-btn">${n}</button>
+              `).join('')}
+              <div></div>
+              <button onclick="pressPinDigit('0')" class="pin-btn">0</button>
+              <button onclick="pressPinBackspace()" title="Delete" class="pin-btn !bg-transparent !border-transparent hover:!bg-white/10">
+                <div class="bg-white text-accent rounded-md px-2 py-1 flex items-center justify-center shadow-sm">
+                  <i data-lucide="delete" class="w-4 h-4"></i>
+                </div>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      // 14. THEME & ACCENT COLOR SCREEN
+      else if (s === 'theme') {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        html = `
+          <div class="flex-1 flex flex-col p-5 overflow-y-auto no-scrollbar screen-enter">
+            <div class="flex items-center gap-3 mb-5">
+              <button onclick="navigate('settings')" class="p-1.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-main">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+              </button>
+              <h2 class="text-lg font-bold text-main">Theme</h2>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3.5 mb-6">
+              <button onclick="setThemeMode('light')" class="p-3 rounded-2xl card-surface flex flex-col items-center gap-2 border-2 ${!isDark ? 'border-accent' : 'border-transparent'}">
+                <div class="w-full h-28 rounded-xl bg-slate-100 border border-slate-200 flex flex-col items-center justify-center p-2">
+                  <div class="w-10 h-14 bg-white rounded-lg shadow flex items-center justify-center">
+                    <div class="w-4 h-4 rounded-full bg-accent"></div>
+                  </div>
+                </div>
+                <span class="text-xs font-semibold text-main">Light</span>
+              </button>
+
+              <button onclick="setThemeMode('dark')" class="p-3 rounded-2xl card-surface flex flex-col items-center gap-2 border-2 ${isDark ? 'border-accent' : 'border-transparent'}">
+                <div class="w-full h-28 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center justify-center p-2">
+                  <div class="w-10 h-14 bg-slate-800 rounded-lg shadow flex items-center justify-center">
+                    <div class="w-4 h-4 rounded-full bg-accent"></div>
+                  </div>
+                </div>
+                <span class="text-xs font-semibold text-main">Dark</span>
+              </button>
+            </div>
+
+            <h3 class="text-xs font-bold uppercase tracking-wider text-sub mb-3 px-1">Accent Color</h3>
+            <div class="card-surface rounded-2xl p-4 flex items-center justify-around mb-5">
+              ${ACCENT_COLORS.map(color => {
+                const selected = state.settings.accentColor === color.hex;
+                return `
+                  <button onclick="setAccentColor('${color.hex}')" style="background-color: ${color.hex}" class="w-9 h-9 rounded-full flex items-center justify-center text-white shadow transition transform ${selected ? 'scale-110 ring-4 ring-offset-2 ring-blue-300 dark:ring-offset-slate-900' : 'opacity-85 hover:opacity-100'}">
+                    ${selected ? '<i data-lucide="check" class="w-4 h-4"></i>' : ''}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+
+            <div class="card-surface rounded-2xl p-4 flex items-center justify-between">
+              <span class="text-sm font-medium text-main">System Default</span>
+              <div onclick="toggleSetting('systemDefaultTheme')" class="toggle-switch ${state.settings.systemDefaultTheme ? 'active' : ''}"></div>
+            </div>
+          </div>
+        `;
+      }
+
+      // 15. PRIVACY & SECURITY SCREEN
+      else if (s === 'privacy-security') {
+        html = `
+          <div class="flex-1 flex flex-col p-5 overflow-y-auto no-scrollbar screen-enter">
+            <div class="flex items-center gap-3 mb-5">
+              <button onclick="navigate('settings')" class="p-1.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-main">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+              </button>
+              <h2 class="text-lg font-bold text-main">Privacy &amp; Security</h2>
+            </div>
+
+            <div class="space-y-3">
+              <div class="card-surface p-4 rounded-2xl flex items-center justify-between">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-9 h-9 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+                    <i data-lucide="lock" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-sm font-semibold text-main">App Lock</h3>
+                    <p class="text-xs text-sub">Use 4-digit PIN to protect the app</p>
+                  </div>
+                </div>
+                <div onclick="handleAppLockToggle()" class="toggle-switch ${state.settings.appLock ? 'active' : ''}"></div>
+              </div>
+
+              <div class="card-surface p-4 rounded-2xl flex items-center justify-between">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-9 h-9 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+                    <i data-lucide="eye-off" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-sm font-semibold text-main">Hide PIN</h3>
+                    <p class="text-xs text-sub">Hide the PIN while entering</p>
+                  </div>
+                </div>
+                <div onclick="toggleSetting('hidePin')" class="toggle-switch ${state.settings.hidePin ? 'active' : ''}"></div>
+              </div>
+
+              <div class="card-surface p-4 rounded-2xl flex items-center justify-between">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-9 h-9 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+                    <i data-lucide="shield-alert" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-sm font-semibold text-main">Mask 2FA Codes</h3>
+                    <p class="text-xs text-sub">Hide 6-digit codes (••• •••) until tapped</p>
+                  </div>
+                </div>
+                <div onclick="toggleGlobalMaskCodes()" class="toggle-switch ${state.settings.maskCodes ? 'active' : ''}"></div>
+              </div>
+
+              <div class="card-surface p-4 rounded-2xl flex items-center justify-between">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-9 h-9 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+                    <i data-lucide="clipboard" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-sm font-semibold text-main">Clipboard Protection</h3>
+                    <p class="text-xs text-sub">Clear clipboard after 30 seconds</p>
+                  </div>
+                </div>
+                <div onclick="toggleSetting('clipboardClear30s')" class="toggle-switch ${state.settings.clipboardClear30s ? 'active' : ''}"></div>
+              </div>
+
+              <div class="card-surface p-4 rounded-2xl">
+                <div class="flex items-center gap-3.5 mb-3">
+                  <div class="w-9 h-9 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+                    <i data-lucide="timer" class="w-4 h-4"></i>
+                  </div>
+                  <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-main">Auto Lock</h3>
+                    <p class="text-xs text-sub">Lock automatically after inactivity</p>
+                  </div>
+                  <div onclick="toggleSetting('autoLock5m')" class="toggle-switch ${state.settings.autoLock5m ? 'active' : ''}"></div>
+                </div>
+                <label class="text-xs text-sub block mb-1.5" for="autoLockMinutes">Lock after</label>
+                <select id="autoLockMinutes" onchange="setAutoLockMinutes(this.value)" class="w-full rounded-xl border p-3 text-sm bg-transparent text-main" style="border-color:var(--border-color)">
+                  ${[[1,'1 minute'],[2,'2 minutes'],[5,'5 minutes'],[10,'10 minutes'],[15,'15 minutes'],[30,'30 minutes'],[60,'1 hour']].map(([v,label])=>`<option value="${v}" ${Number(state.settings.autoLockMinutes || 5)===v?'selected':''}>${label}</option>`).join('')}
+                </select>
+              </div>
+
+              <button onclick="navigate('export-import')" class="w-full card-surface p-4 rounded-2xl flex items-center justify-between text-left">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-9 h-9 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+                    <i data-lucide="cloud-upload" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-sm font-semibold text-main">Data Backup</h3>
+                    <p class="text-xs text-sub">Export / Import accounts</p>
+                  </div>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-sub"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      // 16. EXPORT / IMPORT SCREEN
+      else if (s === 'export-import') {
+        html = `
+          <div class="flex-1 flex flex-col justify-between p-5 overflow-y-auto no-scrollbar screen-enter">
+            <div>
+              <div class="flex items-center gap-3 mb-5">
+                <button onclick="navigate('settings')" class="p-1.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-main">
+                  <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                </button>
+                <h2 class="text-lg font-bold text-main">Export / Import</h2>
+              </div>
+
+              <div class="space-y-3">
+                <button onclick="exportEncryptedBackup()" class="w-full card-surface p-4 rounded-2xl flex items-center justify-between text-left hover:border-accent transition">
+                  <div class="flex items-center gap-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+                      <i data-lucide="download" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                      <h3 class="text-sm font-semibold text-main">Export Encrypted Backup</h3>
+                      <p class="text-xs text-sub">Password-protected .authly backup file</p>
+                    </div>
+                  </div>
+                  <i data-lucide="chevron-right" class="w-4 h-4 text-sub"></i>
+                </button>
+
+                <button onclick="document.getElementById('importJsonInput').click()" class="w-full card-surface p-4 rounded-2xl flex items-center justify-between text-left hover:border-accent transition">
+                  <div class="flex items-center gap-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+                      <i data-lucide="upload" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                      <h3 class="text-sm font-semibold text-main">Import Encrypted Backup</h3>
+                      <p class="text-xs text-sub">Unlock a .authly backup with its password</p>
+                    </div>
+                  </div>
+                  <i data-lucide="chevron-right" class="w-4 h-4 text-sub"></i>
+                </button>
+
+                <button onclick="exportEncryptedBackup()" class="w-full card-surface p-4 rounded-2xl flex items-center justify-between text-left hover:border-accent transition">
+                  <div class="flex items-center gap-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+                      <i data-lucide="hard-drive" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                      <h3 class="text-sm font-semibold text-main">Save Encrypted Backup</h3>
+                      <p class="text-xs text-sub">AES-GCM encrypted file</p>
+                    </div>
+                  </div>
+                  <i data-lucide="chevron-right" class="w-4 h-4 text-sub"></i>
+                </button>
+              </div>
+            </div>
+
+            <button onclick="clearAllAccounts()" class="w-full py-3.5 bg-rose-50 dark:bg-rose-950/40 text-rose-600 font-semibold text-sm rounded-xl hover:bg-rose-100 transition mt-4">
+              Clear All Accounts
+            </button>
+          </div>
+        `;
+      }
+
+      // 17. ABOUT SCREEN
+      else if (s === 'about') {
+        html = `
+          <div class="flex-1 flex flex-col p-5 overflow-y-auto no-scrollbar screen-enter">
+            <div class="flex items-center gap-3 mb-4">
+              <button onclick="navigate('settings')" class="p-1.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-main">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+              </button>
+              <h2 class="text-lg font-bold text-main">About</h2>
+            </div>
+
+            <div class="flex flex-col items-center text-center my-4">
+              ${getShieldGraphic('w-20 h-20', false)}
+              <h3 class="text-2xl font-extrabold text-main mt-3">Authly</h3>
+              <p class="text-xs text-sub mt-0.5">Version 1.0.0</p>
+              <p class="text-xs font-medium text-main mt-2">Your Codes. Your Security.</p>
+            </div>
+
+            <div class="space-y-3 mt-4">
+              <div class="card-surface p-4 rounded-2xl flex items-center gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-accent-soft text-accent flex items-center justify-center shrink-0">
+                  <i data-lucide="database" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h4 class="text-sm font-semibold text-main">Local Storage</h4>
+                  <p class="text-xs text-sub">Your data stays on your device</p>
+                </div>
+              </div>
+
+              <div class="card-surface p-4 rounded-2xl flex items-center gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-accent-soft text-accent flex items-center justify-center shrink-0">
+                  <i data-lucide="wifi-off" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h4 class="text-sm font-semibold text-main">No Internet Required</h4>
+                  <p class="text-xs text-sub">Works offline</p>
+                </div>
+              </div>
+
+              <div class="card-surface p-4 rounded-2xl flex items-center gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-accent-soft text-accent flex items-center justify-center shrink-0">
+                  <i data-lucide="shield-check" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h4 class="text-sm font-semibold text-main">Secure &amp; Private</h4>
+                  <p class="text-xs text-sub">Your privacy matters</p>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="navigate('onboarding-1')" class="mt-6 text-xs font-semibold text-accent text-center py-2 hover:underline">
+              Replay Welcome Tour
+            </button>
+          </div>
+        `;
+      }
+
+      viewport.innerHTML = html;
+      lucide.createIcons();
+    }
+
+    /*************************************************************************
+     * 7. USER INTERACTIONS, ACCOUNT REORDERING, PIN FLOWS & BACKUPS
+     *************************************************************************/
+    function handleSearch(val) {
+      state.searchQuery = val;
+      render();
+      const input = document.getElementById('homeSearchInput');
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    }
+
+    function moveAccountOrder(index, direction) {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= state.accounts.length) return;
+      const temp = state.accounts[index];
+      state.accounts[index] = state.accounts[targetIndex];
+      state.accounts[targetIndex] = temp;
+      saveState();
+      render();
+    }
+
+    function updateSetupAvatarPreview(val) {
+      const wrap = document.getElementById('setupKeyAvatarPreview');
+      if (wrap) {
+        wrap.innerHTML = getServiceLogo(val || 'A', 'w-11 h-11');
+      }
+    }
+
+    function previewEditLogo(iconVal) {
+      const container = document.getElementById('editLogoPreview');
+      const issuerVal = document.getElementById('editIssuer')?.value || 'A';
+      if (container) {
+        container.innerHTML = getServiceLogo(iconVal === 'custom' ? issuerVal : iconVal, 'w-12 h-12');
+      }
+    }
+
+    function saveNewSetupKeyAccount() {
+      const secretInput = document.getElementById('setupKeySecret');
+      const issuerInput = document.getElementById('setupKeyIssuer');
+      const accountInput = document.getElementById('setupKeyAccount');
+      const algoInput = document.getElementById('setupKeyAlgo');
+      const digitsInput = document.getElementById('setupKeyDigits');
+      const periodInput = document.getElementById('setupKeyPeriod');
+
+      const rawValue = (secretInput?.value || '').trim();
+
+      if (rawValue.toLowerCase().startsWith('otpauth')) {
+        const parsedFromUri = parseQrPayloadToAccounts(rawValue);
+        if (parsedFromUri.length > 0) {
+          addMultipleAccountsAndOpenHome(parsedFromUri);
+          return;
+        }
+      }
+
+      const cleanedSecret = cleanBase32Input(rawValue);
+      if (!isValidBase32(cleanedSecret)) {
+        showToast('Invalid Base32 Setup Key (use A-Z and 2-7, min 8 chars)');
+        secretInput?.focus();
+        return;
+      }
+
+      const issuer = (issuerInput?.value || 'Account').trim();
+      const account = (accountInput?.value || 'user@account.com').trim();
+      const algorithm = algoInput?.value || 'SHA-1';
+      const digits = parseInt(digitsInput?.value || '6', 10);
+      const period = parseInt(periodInput?.value || '30', 10);
+
+      addMultipleAccountsAndOpenHome([{ issuer, account, secret: cleanedSecret, algorithm, digits, period }]);
+    }
+
+    function saveEditedAccount(id) {
+      const acc = state.accounts.find(a => a.id === id);
+      if (!acc) return;
+
+      acc.issuer = document.getElementById('editIssuer')?.value.trim() || acc.issuer;
+      acc.account = document.getElementById('editAccountName')?.value.trim() || acc.account;
+      const selectedIcon = document.getElementById('editIconSelect')?.value || acc.icon;
+      acc.icon = selectedIcon;
+      acc.algorithm = document.getElementById('editAlgoSelect')?.value || acc.algorithm || 'SHA-1';
+      acc.digits = parseInt(document.getElementById('editDigitsSelect')?.value || acc.digits || 6, 10);
+      acc.period = parseInt(document.getElementById('editPeriodSelect')?.value || acc.period || 30, 10);
+
+      saveState();
+      updateAllTotpCodes().then(() => {
+        showToast('Changes saved');
+        navigate('account-details', { accountId: id });
+      });
+    }
+
+    function deleteAccount(id) {
+      state.accounts = state.accounts.filter(a => a.id !== id);
+      saveState();
+      showToast('Account removed');
+      navigate('home');
+    }
+
+    function clearAllAccounts() {
+      state.accounts = [];
+      saveState();
+      showToast('All accounts cleared');
+      navigate('home');
+    }
+
+    function openQrShareModal(accountId) {
+      const acc = state.accounts.find(a => a.id === accountId);
+      if (!acc) return;
+      currentQrModalAccount = acc;
+
+      const modal = document.getElementById('qrShareModal');
+      const wrap = document.getElementById('qrShareCanvasWrap');
+      const title = document.getElementById('qrShareTitle');
+      const sub = document.getElementById('qrShareSub');
+      const secretText = document.getElementById('qrShareSecretText');
+
+      title.textContent = `${acc.issuer} (${acc.account})`;
+      sub.textContent = 'Scan with Authly or any 2FA app';
+      secretText.textContent = `Key: ${acc.secret}`;
+      wrap.innerHTML = '';
+
+      const uri = `otpauth://totp/${encodeURIComponent(acc.issuer)}:${encodeURIComponent(acc.account)}?secret=${encodeURIComponent(acc.secret)}&issuer=${encodeURIComponent(acc.issuer)}&algorithm=${encodeURIComponent(acc.algorithm || 'SHA-1')}&digits=${acc.digits || 6}&period=${acc.period || 30}`;
+
+      if (window.QRCode) {
+        new QRCode(wrap, {
+          text: uri,
+          width: 180,
+          height: 180,
+          colorDark: '#000000',
+          colorLight: '#FFFFFF',
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      }
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function downloadAccountQrImage() {
+      if (!currentQrModalAccount) return;
+      const wrap = document.getElementById('qrShareCanvasWrap');
+      const sourceCanvas = wrap?.querySelector('canvas');
+      const sourceImg = wrap?.querySelector('img');
+
+      const outCanvas = document.createElement('canvas');
+      const size = 360;
+      const pad = 40;
+      outCanvas.width = size + pad * 2;
+      outCanvas.height = size + pad * 2;
+      const ctx = outCanvas.getContext('2d');
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, outCanvas.width, outCanvas.height);
+
+      if (sourceCanvas) {
+        ctx.drawImage(sourceCanvas, pad, pad, size, size);
+      } else if (sourceImg) {
+        ctx.drawImage(sourceImg, pad, pad, size, size);
+      } else {
+        showToast('QR not ready yet');
+        return;
+      }
+
+      const url = outCanvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `authly-qr-${currentQrModalAccount.issuer.toLowerCase().replace(/[^a-z0-9]/g, '')}.png`;
+      a.click();
+      showToast('QR image saved!');
+    }
+
+    function closeQrShareModal() {
+      document.getElementById('qrShareModal')?.classList.add('hidden');
+    }
+
+    // Complete Real PIN Setup, Unlock & 3-Step Verification Flow
+    function handleAppLockToggle() {
+      if (!state.settings.appLock) {
+        if (!state.settings.pin) {
+          navigate('pin-lock', { pinMode: 'setup-new' });
+        } else {
+          state.settings.appLock = true;
+          state.isAuthenticated = true;
+          saveState();
+          render();
+          showToast('App Lock Enabled');
+        }
+      } else {
+        state.settings.appLock = false;
+        saveState();
+        render();
+        showToast('App Lock Disabled');
+      }
+    }
+
+    function startChangePinFlow() {
+      if (!state.settings.pin) {
+        navigate('pin-lock', { pinMode: 'setup-new' });
+      } else {
+        navigate('pin-lock', { pinMode: 'verify-old' });
+      }
+    }
+
+    function togglePinMaskDirect() {
+      state.settings.hidePin = !state.settings.hidePin;
+      saveState();
+      render();
+    }
+
+    function updatePinDotsOnly() {
+      const dots = document.getElementById('pinDots');
+      if (!dots) return;
+      dots.innerHTML = [0, 1, 2, 3].map(i => {
+        const filled = i < state.pinBuffer.length;
+        if (filled && !state.settings.hidePin) {
+          return `<div class="w-8 h-8 rounded-full bg-white text-accent font-extrabold text-sm flex items-center justify-center shadow">${state.pinBuffer[i]}</div>`;
+        }
+        return `<span class="w-3.5 h-3.5 rounded-full ${filled ? 'bg-white scale-110 shadow' : 'bg-white/35'}"></span>`;
+      }).join('');
+    }
+
+    function pressPinDigit(digit) {
+      if (state.pinBuffer.length >= 4) return;
+      state.pinError = false;
+      state.pinBuffer += digit;
+      updatePinDotsOnly();
+
+      if (state.pinBuffer.length === 4) {
+        setTimeout(() => {
+          const entered = state.pinBuffer;
+
+          if (state.pinMode === 'unlock') {
+            if (entered === state.settings.pin) {
+              state.pinBuffer = '';
+              state.isAuthenticated = true;
+              showToast('App Unlocked');
+              navigate('home');
+            } else {
+              if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
+              state.pinBuffer = '';
+              state.pinError = true;
+              showToast('Incorrect PIN');
+              render();
+            }
+          } else if (state.pinMode === 'setup-new') {
+            state.tempNewPin = entered;
+            state.pinBuffer = '';
+            state.pinMode = 'confirm-new';
+            render();
+          } else if (state.pinMode === 'verify-old') {
+            if (entered === state.settings.pin) {
+              state.pinBuffer = '';
+              state.pinMode = 'set-new';
+              showToast('Verified — enter your new PIN');
+              render();
+            } else {
+              if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
+              state.pinBuffer = '';
+              state.pinError = true;
+              showToast('Incorrect current PIN');
+              render();
+            }
+          } else if (state.pinMode === 'set-new') {
+            state.tempNewPin = entered;
+            state.pinBuffer = '';
+            state.pinMode = 'confirm-new';
+            render();
+          } else if (state.pinMode === 'confirm-new') {
+            if (entered === state.tempNewPin) {
+              state.settings.pin = entered;
+              state.settings.appLock = true;
+              state.isAuthenticated = true;
+              state.tempNewPin = '';
+              state.pinBuffer = '';
+              saveState();
+              showToast('PIN saved & App Lock active');
+              navigate('settings');
+            } else {
+              if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
+              state.pinBuffer = '';
+              state.pinError = true;
+              showToast('PINs did not match — try again');
+              state.pinMode = 'set-new';
+              render();
+            }
+          }
+        }, 160);
+      }
+    }
+
+    function pressPinBackspace() {
+      state.pinBuffer = state.pinBuffer.slice(0, -1);
+      state.pinError = false;
+      document.querySelector('.screen-enter .shake-error')?.classList.remove('shake-error');
+      updatePinDotsOnly();
+    }
+
+    function lockAppNow() {
+      if (!state.settings.pin) {
+        navigate('pin-lock', { pinMode: 'setup-new' });
+        return;
+      }
+      state.isAuthenticated = false;
+      navigate('pin-lock', { pinMode: 'unlock' });
+    }
+
+    function toggleSetting(key) {
+      state.settings[key] = !state.settings[key];
+      if (key === 'notifications' && state.settings.notifications && 'Notification' in window) {
+        Notification.requestPermission().catch(() => {});
+      }
+      if (key === 'clipboardClear30s' && !state.settings.clipboardClear30s) {
+        clearInterval(clipboardIntervalId);
+        document.getElementById('clipboardBanner')?.classList.add('hidden');
+      }
+      saveState();
+      applyThemeAndAccent();
+      render();
+    }
+
+    function setThemeMode(mode) {
+      state.settings.theme = mode;
+      state.settings.systemDefaultTheme = false;
+      saveState();
+      applyThemeAndAccent();
+      render();
+    }
+
+    function setAccentColor(hex) {
+      state.settings.accentColor = hex;
+      saveState();
+      applyThemeAndAccent();
+      render();
+    }
+
+    // Password-protected backup format: AES-256-GCM + PBKDF2-SHA-256.
+    // The file contains ciphertext only; the password is never stored.
+    const AUTHLY_BACKUP_MAGIC = 'AUTHLY-SECURE-BACKUP';
+    const AUTHLY_BACKUP_ITERATIONS = 310000;
+
+    function bytesToBase64(bytes) {
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    }
+    function base64ToBytes(text) {
+      const binary = atob(text);
+      const out = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+      return out;
+    }
+    async function deriveBackupKey(password, salt) {
+      const material = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
+      );
+      return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: AUTHLY_BACKUP_ITERATIONS, hash: 'SHA-256' },
+        material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+      );
+    }
+    function exportEncryptedBackup() {
+      if (!state.accounts.length) { showToast('No accounts to back up yet'); return; }
+      if (!window.crypto || !crypto.subtle) { showToast('Secure encryption requires HTTPS or a modern secure browser'); return; }
+      const modal = document.getElementById('backupPasswordModal');
+      const form = document.getElementById('backupPasswordForm');
+      const passwordInput = document.getElementById('backupPassword');
+      const confirmInput = document.getElementById('backupPasswordConfirm');
+      const error = document.getElementById('backupPasswordError');
+      form.dataset.busy = '0';
+      passwordInput.value = ''; confirmInput.value = ''; error.textContent = ''; error.classList.add('hidden');
+      modal.classList.remove('hidden'); modal.classList.add('flex');
+      setTimeout(() => passwordInput.focus(), 80);
+    }
+
+    async function createEncryptedBackup(password) {
+      try {
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const key = await deriveBackupKey(password, salt);
+        const payload = JSON.stringify({
+          app: 'Authly Authenticator',
+          version: 2,
+          exportedAt: new Date().toISOString(),
+          accounts: state.accounts
+        });
+        const encrypted = await crypto.subtle.encrypt(
+          { name: 'AES-GCM', iv }, key, new TextEncoder().encode(payload)
+        );
+        const envelope = {
+          format: AUTHLY_BACKUP_MAGIC,
+          version: 1,
+          kdf: 'PBKDF2-SHA-256',
+          iterations: AUTHLY_BACKUP_ITERATIONS,
+          cipher: 'AES-256-GCM',
+          salt: bytesToBase64(salt),
+          iv: bytesToBase64(iv),
+          ciphertext: bytesToBase64(new Uint8Array(encrypted))
+        };
+        const blob = new Blob([JSON.stringify(envelope)], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `authly-secure-backup-${new Date().toISOString().slice(0,10)}.authly`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        showToast('Encrypted backup saved');
+      } catch (err) {
+        console.error(err);
+        showToast('Could not create encrypted backup');
+      }
+    }
+
+    // Password dialog validation and encrypted-backup download.
+    document.getElementById('backupPasswordForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      if (form.dataset.busy === '1') return;
+      const password = document.getElementById('backupPassword').value;
+      const confirmation = document.getElementById('backupPasswordConfirm').value;
+      const error = document.getElementById('backupPasswordError');
+      error.classList.add('hidden');
+      if (password.length < 8) { error.textContent = 'Password must be at least 8 characters.'; error.classList.remove('hidden'); return; }
+      if (password !== confirmation) { error.textContent = 'Passwords do not match. Please try again.'; error.classList.remove('hidden'); return; }
+      form.dataset.busy = '1';
+      const submit = form.querySelector('button[type="submit"]');
+      const originalLabel = submit.textContent; submit.disabled = true; submit.textContent = 'Encrypting…';
+      try {
+        await createEncryptedBackup(password);
+        const modal = document.getElementById('backupPasswordModal'); modal.classList.add('hidden'); modal.classList.remove('flex');
+        document.getElementById('backupPassword').value = ''; document.getElementById('backupPasswordConfirm').value = '';
+      } finally { form.dataset.busy = '0'; submit.disabled = false; submit.textContent = originalLabel; }
+    });
+    document.getElementById('cancelBackupPassword').addEventListener('click', () => {
+      const modal = document.getElementById('backupPasswordModal'); modal.classList.add('hidden'); modal.classList.remove('flex');
+      document.getElementById('backupPassword').value = ''; document.getElementById('backupPasswordConfirm').value = '';
+    });
+    document.getElementById('toggleBackupPassword').addEventListener('click', () => {
+      const input = document.getElementById('backupPassword');
+      input.type = input.type === 'password' ? 'text' : 'password';
+      document.getElementById('toggleBackupPassword').setAttribute('aria-label', input.type === 'password' ? 'Show password' : 'Hide password');
+    });
+
+    // Legacy JSON import is retained for migration; prefer .authly encrypted backups.
+    async function handleJsonImport(event) {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+      try {
+        const raw = await file.text();
+        let data;
+        try { data = JSON.parse(raw); } catch (_) {
+          showToast('This backup file is not valid');
+          return;
+        }
+        if (data?.format === AUTHLY_BACKUP_MAGIC) {
+          if (!crypto?.subtle) {
+            showToast('Secure decryption requires a modern secure browser');
+            return;
+          }
+          const password = prompt('Enter the password used to create this backup');
+          if (password === null) return;
+          try {
+            if (data.cipher !== 'AES-256-GCM' || data.kdf !== 'PBKDF2-SHA-256' ||
+                !Number.isInteger(data.iterations) || data.iterations < 100000) {
+              throw new Error('Unsupported backup format');
+            }
+            const key = await deriveBackupKey(password, base64ToBytes(data.salt));
+            const decrypted = await crypto.subtle.decrypt(
+              { name: 'AES-GCM', iv: base64ToBytes(data.iv) },
+              key, base64ToBytes(data.ciphertext)
+            );
+            data = JSON.parse(new TextDecoder().decode(decrypted));
+          } catch (err) {
+            showToast('Wrong password or damaged backup file');
+            return;
+          }
+        } else {
+          const acceptLegacy = confirm('This appears to be an unencrypted legacy JSON backup. Anyone with the file may read its secrets. Import it anyway?');
+          if (!acceptLegacy) return;
+        }
+        const importedList = Array.isArray(data) ? data : data.accounts;
+        if (!Array.isArray(importedList)) {
+          showToast('Invalid backup file structure');
+          return;
+        }
+        const validAccounts = importedList
+          .filter(a => a && a.secret && isValidBase32(a.secret))
+          .map((a, idx) => ({
+            id: a.id || `acc_${Date.now()}_${idx}`,
+            issuer: a.issuer || 'Imported Service',
+            account: a.account || 'user',
+            secret: cleanBase32Input(a.secret),
+            algorithm: ['SHA-1','SHA-256','SHA-512'].includes(String(a.algorithm || 'SHA-1').toUpperCase()) ? String(a.algorithm || 'SHA-1').toUpperCase() : 'SHA-1',
+            digits: Number(a.digits) === 8 ? 8 : 6,
+            period: Math.min(120, Math.max(1, Number(a.period) || 30)),
+            icon: inferServiceBrand(a.icon || a.issuer || 'custom', a.account || '')
+          }));
+        if (!validAccounts.length) {
+          showToast('No valid authenticator accounts found');
+          return;
+        }
+        if (!confirm(`Restore ${validAccounts.length} accounts? This replaces the accounts currently stored in this browser.`)) return;
+        state.accounts = validAccounts;
+        saveState();
+        await updateAllTotpCodes();
+        showToast(`Restored ${validAccounts.length} accounts`);
+        navigate('home');
+      } catch (err) {
+        console.error(err);
+        showToast('Could not read this backup file');
+      }
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      if (!toast || !toastMsg) return;
+      toastMsg.textContent = msg;
+      toast.classList.remove('opacity-0', 'translate-y-4');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-4');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 2600);
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    /*************************************************************************
+     * 8. REAL CLOCK, BATTERY API & AUTO-LOCK MONITOR
+     *************************************************************************/
+    function updateStatusBarClockAndNetwork() {
+      const clockEl = document.getElementById('statusClock');
+      if (clockEl) {
+        const now = new Date();
+        const hrs = now.getHours() % 12 || 12;
+        const mins = String(now.getMinutes()).padStart(2, '0');
+        clockEl.textContent = `${hrs}:${mins}`;
+      }
+      const wifiIcon = document.getElementById('wifiStatusIcon');
+      if (wifiIcon) {
+        wifiIcon.style.opacity = navigator.onLine ? '1' : '0.35';
+      }
+    }
+
+    async function initBatteryStatus() {
+      if ('getBattery' in navigator) {
+        try {
+          const bat = await navigator.getBattery();
+          const updateBat = () => {
+            const pct = Math.round(bat.level * 100);
+            const fill = document.getElementById('batteryFill');
+            const label = document.getElementById('batteryPct');
+            if (fill) fill.style.width = `${pct}%`;
+            if (label) label.textContent = `${pct}%`;
+          };
+          updateBat();
+          bat.addEventListener('levelchange', updateBat);
+        } catch (e) {}
+      }
+    }
+
+    function setAutoLockMinutes(value) {
+      const minutes = Number(value);
+      if (![1, 2, 5, 10, 15, 30, 60].includes(minutes)) return;
+      state.settings.autoLockMinutes = minutes;
+      state.lastActivityAt = Date.now();
+      saveState();
+      showToast('Auto Lock duration updated');
+    }
+
+    function setupInactivityAutoLock() {
+      const bumpActivity = () => { state.lastActivityAt = Date.now(); };
+      ['pointerdown', 'keydown', 'touchstart'].forEach(evt =>
+        window.addEventListener(evt, bumpActivity, { passive: true })
+      );
+
+      setInterval(() => {
+        if (
+          state.settings.appLock &&
+          state.settings.pin &&
+          state.settings.autoLock5m &&
+          state.isAuthenticated &&
+          state.currentScreen !== 'pin-lock' &&
+          Date.now() - state.lastActivityAt > Number(state.settings.autoLockMinutes || 5) * 60 * 1000
+        ) {
+          lockAppNow();
+          showToast('App auto-locked due to inactivity');
+        }
+      }, 10000);
+    }
+
+    // Keyboard support for PIN Lock screen
+    window.addEventListener('keydown', (e) => {
+      if (state.currentScreen === 'pin-lock') {
+        if (/^[0-9]$/.test(e.key)) {
+          pressPinDigit(e.key);
+        } else if (e.key === 'Backspace') {
+          pressPinBackspace();
+        }
+      }
+    });
+
+    /*************************************************************************
+     * 9. BOOTSTRAP APPLICATION
+     *************************************************************************/
+    window.addEventListener('DOMContentLoaded', async () => {
+      loadState();
+      updateStatusBarClockAndNetwork();
+      initBatteryStatus();
+      setupInactivityAutoLock();
+      await updateAllTotpCodes();
+
+      render();
+      setTimeout(() => {
+        if (state.currentScreen === 'splash') {
+          if (state.settings.appLock && state.settings.pin && !state.isAuthenticated) {
+            navigate('pin-lock', { pinMode: 'unlock' });
+          } else if (!state.settings.hasCompletedOnboarding) {
+            navigate('onboarding-1');
+          } else {
+            navigate('home');
+          }
+        }
+      }, 900);
+
+      setInterval(() => {
+        updateAllTotpCodes();
+        updateStatusBarClockAndNetwork();
+      }, 1000);
+    });
+  </script>
+</body>
+</html>
