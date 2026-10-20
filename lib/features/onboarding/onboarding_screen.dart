@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/service_icon.dart';
 import '../../core/widgets/shield_lock_logo.dart';
 
@@ -151,7 +152,6 @@ class _Illustration extends StatelessWidget {
         phoneContent = ShieldLockLogo(
           size: 76,
           shieldColor: scheme.primary,
-          filled: true,
         );
       case 1:
         phoneContent = Icon(Icons.qr_code_2_rounded, size: 96, color: scheme.primary);
@@ -164,8 +164,9 @@ class _Illustration extends StatelessWidget {
               style: TextStyle(
                 color: scheme.primary,
                 fontSize: 24,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 1,
+                fontFamily: AppTheme.codeFont,
               ),
             ),
             const SizedBox(height: 14),

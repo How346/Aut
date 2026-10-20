@@ -303,7 +303,6 @@ class _EmptyState extends StatelessWidget {
                 child: ShieldLockLogo(
                   size: 62,
                   shieldColor: scheme.primary,
-                  filled: true,
                 ),
               ),
             ),
@@ -455,7 +454,6 @@ class _HomeTab extends StatelessWidget {
                 decoration: InputDecoration(
                   hintText: 'Search accounts...',
                   prefixIcon: const Icon(Icons.search),
-                  filled: true,
                   fillColor: scheme.surfaceContainerHighest,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   border: OutlineInputBorder(

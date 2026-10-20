@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
+  /// Monospace face used for one-time codes (bundled, works offline).
+  static const String codeFont = 'JetBrainsMono';
+
   /// Selectable accent colours (first one is the default blue).
   static const List<Color> accents = [
     Color(0xFF1565E8),
@@ -95,6 +98,12 @@ class AppTheme {
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: dark ? navy : const Color(0xFFF6F9FF),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: false,

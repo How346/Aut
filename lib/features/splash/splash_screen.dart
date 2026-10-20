@@ -51,7 +51,11 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             children: [
               const Spacer(flex: 3),
-              const ShieldLockLogo(size: 124, shieldColor: Colors.white),
+              const ShieldLockLogo(
+                size: 120,
+                shieldColor: Colors.white,
+                cutout: true,
+              ),
               const SizedBox(height: 18),
               const Text(
                 'Authly',

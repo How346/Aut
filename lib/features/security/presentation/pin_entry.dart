@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../app_lock_controller.dart';
 
 /// Lock icon, title, PIN dots and a numeric keypad. Meant to be shown on the
@@ -125,6 +126,7 @@ class _PinEntryState extends State<PinEntry>
               color: Colors.white,
               fontSize: 26,
               fontWeight: FontWeight.w700,
+              fontFamily: AppTheme.codeFont,
             ),
           ),
         ),

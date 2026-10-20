@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 /// Shows a (grouped) one-time code. Every digit rolls up and fades in with a
 /// small stagger whenever it changes, and turns into a bullet when [masked].
 class AnimatedCode extends StatelessWidget {
@@ -24,7 +26,7 @@ class AnimatedCode extends StatelessWidget {
     for (var i = 0; i < code.length; i++) {
       final ch = code[i];
       if (ch == ' ') {
-        slots.add(SizedBox(width: fontSize * 0.4));
+        slots.add(SizedBox(width: fontSize * 0.32));
         continue;
       }
       slots.add(
@@ -93,8 +95,8 @@ class _DigitSlotState extends State<_DigitSlot>
       ch,
       style: TextStyle(
         fontSize: widget.fontSize,
-        fontWeight: FontWeight.w800,
-        fontFamily: 'monospace',
+        fontWeight: FontWeight.w700,
+        fontFamily: AppTheme.codeFont,
         color: widget.color,
         height: 1.0,
       ),
@@ -107,7 +109,7 @@ class _DigitSlotState extends State<_DigitSlot>
     final travel = widget.fontSize * 0.7;
 
     return SizedBox(
-      width: widget.fontSize * 0.62,
+      width: widget.fontSize * 0.66,
       height: widget.fontSize * 1.3,
       child: ClipRect(
         child: AnimatedBuilder(

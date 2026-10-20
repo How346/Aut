@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/widgets/animated_code.dart';
 import '../../../../core/widgets/countdown_ring.dart';
+import '../../../../core/widgets/press_scale.dart';
 import '../../../../core/widgets/service_icon.dart';
 import '../../domain/models/totp_account.dart';
 import '../../domain/services/totp_service.dart';
@@ -39,7 +40,8 @@ class AccountCard extends StatelessWidget {
       code = null;
     }
 
-    return Card(
+    return PressScale(
+      child: Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -120,6 +122,7 @@ class AccountCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

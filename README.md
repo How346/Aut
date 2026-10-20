@@ -13,6 +13,9 @@ Authly is an offline-first, privacy-focused, zero-telemetry two-factor authentic
 
 ## Highlights
 
+- Brand logo (shield + padlock) used for the launcher icon, splash and in-app artwork.
+- Codes use the bundled JetBrains Mono font (SIL OFL licence in `assets/fonts/`).
+
 - Splash, 3-step onboarding, bottom navigation (Home / Accounts / Settings), account details, edit, empty state.
 - Add accounts by camera scan, **QR from gallery**, setup key, popular-service shortcuts, pasted `otpauth://` link, or a Google Authenticator export QR.
 - App lock with 4-digit PIN (PBKDF2-hashed, Android Keystore storage), biometric unlock, auto-lock timeout, hide-PIN option and attempt lockout.

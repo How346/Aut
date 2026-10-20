@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/press_scale.dart';
 import '../../../../core/widgets/service_icon.dart';
 import '../../../scanner/data/qr_gallery_picker.dart';
 import '../../../scanner/presentation/screens/qr_scanner_screen.dart';
@@ -108,7 +109,8 @@ class _AddAccountOptionsScreenState extends State<AddAccountOptionsScreen> {
     required VoidCallback onTap,
   }) {
     final scheme = Theme.of(context).colorScheme;
-    return Card(
+    return PressScale(
+      child: Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -151,6 +153,7 @@ class _AddAccountOptionsScreenState extends State<AddAccountOptionsScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

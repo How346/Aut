@@ -34,6 +34,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   TotpAccount? _account;
   Timer? _ticker;
   DateTime? _revealUntil;
+  bool _copied = false;
 
   bool get _masked {
     if (!widget.settings.maskCodes) return false;
@@ -46,6 +47,15 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       _revealUntil =
           _masked ? DateTime.now().add(const Duration(seconds: 10)) : null;
     });
+  }
+
+  Future<void> _copyCode(TotpAccount account) async {
+    await CodeClipboard.copy(context, account, widget.settings);
+    if (!mounted) return;
+    setState(() => _copied = true);
+    await Future<void>.delayed(const Duration(milliseconds: 1500));
+    if (!mounted) return;
+    setState(() => _copied = false);
   }
 
   Future<void> _toggleMask() async {
@@ -243,8 +253,8 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Card(
-                      elevation: 3,
-                      shadowColor: Colors.black26,
+                      elevation: 8,
+                      shadowColor: scheme.primary.withValues(alpha: 0.28),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
@@ -305,13 +315,18 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                                 OutlinedButton.icon(
                                   onPressed: code == null
                                       ? null
-                                      : () => CodeClipboard.copy(
-                                            context,
-                                            account,
-                                            widget.settings,
-                                          ),
-                                  icon: const Icon(Icons.copy_outlined, size: 18),
-                                  label: const Text('Copy'),
+                                      : () => _copyCode(account),
+                                  icon: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 200),
+                                    child: Icon(
+                                      _copied
+                                          ? Icons.check_rounded
+                                          : Icons.copy_outlined,
+                                      key: ValueKey<bool>(_copied),
+                                      size: 18,
+                                    ),
+                                  ),
+                                  label: Text(_copied ? 'Copied' : 'Copy'),
                                 ),
                                 const SizedBox(width: 10),
                                 TextButton.icon(

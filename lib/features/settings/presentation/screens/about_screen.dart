@@ -19,7 +19,6 @@ class AboutScreen extends StatelessWidget {
             child: ShieldLockLogo(
               size: 84,
               shieldColor: scheme.secondary,
-              filled: true,
             ),
           ),
           const SizedBox(height: 12),
